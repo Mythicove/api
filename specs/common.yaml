@@ -1,0 +1,35 @@
+openapi: 3.1.0
+info:
+  title: Mythicove 公共模型
+  version: 0.1.0
+components:
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: ForbiddenOperationException
+        errorMessage:
+          type: string
+        cause:
+          type: string
+    PageInfo:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+        offset:
+          type: integer
+  responses:
+    Error:
+      description: 通用错误响应
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

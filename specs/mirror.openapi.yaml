@@ -1,0 +1,452 @@
+openapi: 3.1.0
+info:
+  title: Mythic Mirror API
+  version: 0.1.0
+  description: 皮肤站契约，对齐 authlib-injector 的 Yggdrasil 服务端规范。
+servers:
+  - url: /
+paths:
+  /:
+    get:
+      operationId: getMeta
+      summary: 根 meta 端点
+      description: 返回服务元信息，供客户端发现签名公钥与皮肤域名。
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meta"
+  /authserver/authenticate:
+    post:
+      operationId: authenticate
+      summary: 账号密码认证
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthenticateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticateResponse"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /authserver/refresh:
+    post:
+      operationId: refresh
+      summary: 刷新访问令牌
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RefreshResponse"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /authserver/validate:
+    post:
+      operationId: validate
+      summary: 校验访问令牌
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateRequest"
+      responses:
+        "204":
+          description: 令牌有效
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /authserver/invalidate:
+    post:
+      operationId: invalidate
+      summary: 使令牌失效
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvalidateRequest"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /authserver/signout:
+    post:
+      operationId: signout
+      summary: 退出登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignoutRequest"
+      responses:
+        "204":
+          description: OK
+  /sessionserver/session/minecraft/join:
+    post:
+      operationId: join
+      summary: 记录 serverId 会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRequest"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /sessionserver/session/minecraft/hasJoined:
+    get:
+      operationId: hasJoined
+      summary: 服务端换取玩家资料
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: serverId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ip
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 已加入，返回带签名的 profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "204":
+          description: 尚未加入
+  /sessionserver/session/minecraft/profile/{uuid}:
+    get:
+      operationId: getProfile
+      summary: 按 UUID 取 profile
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: unsigned
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "204":
+          description: 无此 profile
+  /api/profiles/minecraft:
+    post:
+      operationId: queryProfiles
+      summary: 批量 name → UUID 查询
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              maxItems: 10
+              items:
+                type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Player"
+  /skin/{name}:
+    get:
+      operationId: getSkin
+      summary: 按玩家名下载皮肤
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 皮肤 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+  /cape/{name}:
+    get:
+      operationId: getCape
+      summary: 按玩家名下载披风
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 披风 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+  /avatar/{uuid}:
+    get:
+      operationId: getAvatar
+      summary: crafatar 兼容 2D 头像
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 头像 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    Meta:
+      type: object
+      properties:
+        meta:
+          type: object
+          properties:
+            serverName:
+              type: string
+            implementationName:
+              type: string
+            implementationVersion:
+              type: string
+        skinDomains:
+          type: array
+          items:
+            type: string
+        signaturePublickey:
+          type: string
+          description: base64 编码的 PEM 公钥
+    AuthenticateRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        clientToken:
+          type: string
+        requestUser:
+          type: boolean
+          default: false
+        agent:
+          type: object
+          properties:
+            name:
+              type: string
+              default: Minecraft
+            version:
+              type: integer
+    Profile:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        properties:
+          type: array
+          items:
+            $ref: "#/components/schemas/Property"
+    Property:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+          description: base64 编码的 textures JSON
+        signature:
+          type: string
+          description: base64 编码的 RSA 签名
+    Textures:
+      type: object
+      description: textures 属性的解码结构
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+        profileId:
+          type: string
+        profileName:
+          type: string
+        textures:
+          type: object
+          properties:
+            SKIN:
+              type: object
+              properties:
+                url:
+                  type: string
+                metadata:
+                  type: object
+                  properties:
+                    model:
+                      type: string
+                      enum: [slim, default]
+            CAPE:
+              type: object
+              properties:
+                url:
+                  type: string
+    Player:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        legacy:
+          type: boolean
+        demo:
+          type: boolean
+    AuthenticateResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        clientToken:
+          type: string
+        availableProfiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+        selectedProfile:
+          $ref: "#/components/schemas/Player"
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+            properties:
+              type: array
+              items:
+                $ref: "#/components/schemas/Property"
+    RefreshRequest:
+      type: object
+      required:
+        - accessToken
+        - clientToken
+      properties:
+        accessToken:
+          type: string
+        clientToken:
+          type: string
+        selectedProfile:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+    RefreshResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        clientToken:
+          type: string
+        selectedProfile:
+          $ref: "#/components/schemas/Player"
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+    ValidateRequest:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        clientToken:
+          type: string
+    InvalidateRequest:
+      type: object
+      required:
+        - accessToken
+        - clientToken
+      properties:
+        accessToken:
+          type: string
+        clientToken:
+          type: string
+    SignoutRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    JoinRequest:
+      type: object
+      required:
+        - accessToken
+        - selectedProfile
+        - serverId
+      properties:
+        accessToken:
+          type: string
+        selectedProfile:
+          type: string
+        serverId:
+          type: string

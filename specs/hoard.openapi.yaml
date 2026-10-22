@@ -1,0 +1,684 @@
+openapi: 3.1.0
+info:
+  title: Mythic Hoard API
+  version: 0.1.0
+  description: |
+    Mod 托管契约，对齐 Modrinth API v2 的只读子集。字段名与 Modrinth 保持一致，
+    以让 Prism Launcher / ferium / packwiz / Pakku 等客户端零成本接入。写操作（上传/组织）后续迭代。
+servers:
+  - url: /
+tags:
+  - name: search
+  - name: project
+  - name: version
+  - name: tag
+  - name: user
+  - name: team
+paths:
+  /v2/search:
+    get:
+      operationId: search
+      tags: [search]
+      summary: 全文 + facets 搜索
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: facets
+          in: query
+          required: false
+          description: JSON 编码的 facets 数组，如 [["categories:forge"],["versions:1.20.1"]]
+          schema:
+            type: string
+        - name: index
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [relevance, downloads, follows, newest, updated]
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+  /v2/project/{id}:
+    get:
+      operationId: getProject
+      tags: [project]
+      summary: 按 id 或 slug 取项目
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/projects:
+    get:
+      operationId: getProjects
+      tags: [project]
+      summary: 批量取项目
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: JSON 编码的 id/slug 数组
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+  /v2/project/{id}/version:
+    get:
+      operationId: getProjectVersions
+      tags: [version]
+      summary: 取项目的所有版本
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: loaders
+          in: query
+          required: false
+          description: JSON 编码的 loader 数组
+          schema:
+            type: string
+        - name: game_versions
+          in: query
+          required: false
+          description: JSON 编码的游戏版本数组
+          schema:
+            type: string
+        - name: featured
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Version"
+  /v2/version/{id}:
+    get:
+      operationId: getVersion
+      tags: [version]
+      summary: 按 id 取版本
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/versions:
+    get:
+      operationId: getVersions
+      tags: [version]
+      summary: 批量取版本
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: JSON 编码的版本 id 数组
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Version"
+  /v2/version_files:
+    get:
+      operationId: getVersionFiles
+      tags: [version]
+      summary: 按版本 id 批量取文件
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: JSON 编码的版本 id 数组
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/File"
+  /v2/version_file/{hash}:
+    get:
+      operationId: getVersionFileByHash
+      tags: [version]
+      summary: 按文件哈希取版本文件
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: algorithm
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [sha1, sha512]
+            default: sha1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/project/{id}/dependencies:
+    get:
+      operationId: getProjectDependencies
+      tags: [project]
+      summary: 取项目的依赖关系
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDependencies"
+  /v2/tag/category:
+    get:
+      operationId: getCategories
+      tags: [tag]
+      summary: 取分类列表
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+  /v2/tag/loader:
+    get:
+      operationId: getLoaders
+      tags: [tag]
+      summary: 取 loader 列表
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loader"
+  /v2/tag/game_version:
+    get:
+      operationId: getGameVersions
+      tags: [tag]
+      summary: 取游戏版本列表
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameVersion"
+  /v2/user/{id}:
+    get:
+      operationId: getUser
+      tags: [user]
+      summary: 按 id 取用户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/users:
+    get:
+      operationId: getUsers
+      tags: [user]
+      summary: 批量取用户
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: JSON 编码的用户 id 数组
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /v2/team/{id}/members:
+    get:
+      operationId: getTeamMembers
+      tags: [team]
+      summary: 取团队成员
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamMember"
+  /cdn/data/{project}/{version}/{file}:
+    get:
+      operationId: downloadFile
+      tags: [version]
+      summary: 下载版本文件（S3/CDN 直出）
+      parameters:
+        - name: project
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: file
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 文件内容
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+components:
+  responses:
+    Error:
+      description: 错误响应
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ModrinthError"
+  schemas:
+    ModrinthError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        description:
+          type: string
+    License:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+    SearchResponse:
+      type: object
+      required: [hits, offset, limit, total_hits]
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchHit"
+        offset:
+          type: integer
+        limit:
+          type: integer
+        total_hits:
+          type: integer
+          format: int64
+    SearchHit:
+      type: object
+      properties:
+        project_id:
+          type: string
+        project_type:
+          type: string
+          enum: [mod, modpack, resourcepack, shader, plugin, datapack]
+        slug:
+          type: string
+        author:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        versions:
+          type: array
+          items:
+            type: string
+        downloads:
+          type: integer
+          format: int64
+        follows:
+          type: integer
+        icon_url:
+          type: string
+        date_created:
+          type: string
+          format: date-time
+        date_modified:
+          type: string
+          format: date-time
+        latest_version:
+          type: string
+        license:
+          type: string
+        client_side:
+          type: string
+          enum: [required, optional, unsupported, unknown]
+        server_side:
+          type: string
+          enum: [required, optional, unsupported, unknown]
+        color:
+          type: integer
+    Project:
+      type: object
+      required: [id, slug, title, project_type]
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        client_side:
+          type: string
+          enum: [required, optional, unsupported, unknown]
+        server_side:
+          type: string
+          enum: [required, optional, unsupported, unknown]
+        body:
+          type: string
+        status:
+          type: string
+          enum: [approved, archived, rejected, draft, unlisted, processing, unknown]
+        project_type:
+          type: string
+          enum: [mod, modpack, resourcepack, shader, plugin, datapack]
+        downloads:
+          type: integer
+          format: int64
+        icon_url:
+          type: string
+        team:
+          type: string
+        published:
+          type: string
+          format: date-time
+        updated:
+          type: string
+          format: date-time
+        followers:
+          type: integer
+        license:
+          $ref: "#/components/schemas/License"
+        versions:
+          type: array
+          items:
+            type: string
+        game_versions:
+          type: array
+          items:
+            type: string
+        loaders:
+          type: array
+          items:
+            type: string
+    Version:
+      type: object
+      required: [id, project_id, version_number]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        name:
+          type: string
+        version_number:
+          type: string
+        changelog:
+          type: string
+        version_type:
+          type: string
+          enum: [release, beta, alpha]
+        loaders:
+          type: array
+          items:
+            type: string
+        game_versions:
+          type: array
+          items:
+            type: string
+        featured:
+          type: boolean
+        status:
+          type: string
+          enum: [listed, archived, draft, unlisted, scheduled, unknown]
+        author_id:
+          type: string
+        date_published:
+          type: string
+          format: date-time
+        downloads:
+          type: integer
+          format: int64
+        dependencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dependency"
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/File"
+    Dependency:
+      type: object
+      properties:
+        version_id:
+          type: string
+        project_id:
+          type: string
+        file_name:
+          type: string
+        dependency_type:
+          type: string
+          enum: [required, optional, incompatible, embedded]
+    ProjectDependencies:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Version"
+    File:
+      type: object
+      properties:
+        hashes:
+          type: object
+          properties:
+            sha1:
+              type: string
+            sha512:
+              type: string
+        url:
+          type: string
+        filename:
+          type: string
+        primary:
+          type: boolean
+        size:
+          type: integer
+          format: int64
+        file_type:
+          type: string
+          enum: [required-resource-pack, optional-resource-pack, required-datapack, optional-datapack]
+    Category:
+      type: object
+      properties:
+        name:
+          type: string
+        project_type:
+          type: string
+        header:
+          type: string
+        icon:
+          type: string
+    Loader:
+      type: object
+      properties:
+        name:
+          type: string
+        icon:
+          type: string
+        supported_project_types:
+          type: array
+          items:
+            type: string
+    GameVersion:
+      type: object
+      properties:
+        version:
+          type: string
+        version_type:
+          type: string
+          enum: [release, snapshot, alpha, beta]
+        date:
+          type: string
+          format: date-time
+        major:
+          type: boolean
+    User:
+      type: object
+      required: [id, username]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, moderator, developer]
+        avatar_url:
+          type: string
+        bio:
+          type: string
+        created:
+          type: string
+          format: date-time
+    TeamMember:
+      type: object
+      properties:
+        team_id:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        role:
+          type: string
+        permissions:
+          type: integer
+        organization:
+          type: boolean

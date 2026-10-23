@@ -556,7 +556,7 @@ paths:
               properties:
                 data:
                   type: string
-                  description: JSON（title/description/body/project_type/client_side/server_side/loaders[]/game_versions[]/categories[]/version_name/version_number/version_type/changelog）
+                  description: JSON（title/description/body/project_type/client_side/server_side/loaders[]/game_versions[]/categories[]/version_name/version_number/version_type/changelog/dependencies[]）
                 file:
                   type: string
                   format: binary
@@ -593,7 +593,7 @@ paths:
               properties:
                 data:
                   type: string
-                  description: JSON（project_id/name/version_number/version_type/changelog/loaders[]/game_versions[]）
+                  description: JSON（project_id/name/version_number/version_type/changelog/loaders[]/game_versions[]/dependencies[]）
                 file:
                   type: string
                   format: binary
@@ -680,6 +680,24 @@ paths:
               schema:
                 type: string
                 format: binary
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/project/{id}/dependencies:
+    get:
+      operationId: getProjectDependencies
+      tags: [version]
+      summary: 项目全部版本的依赖（Modrinth 形）
+      parameters:
+        - $ref: "#/components/parameters/ProjectID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dependency"
         "404":
           $ref: "#/components/responses/Error"
   /v2/project/{id}/version:
@@ -889,6 +907,24 @@ components:
           type: string
         created_at:
           type: string
+    Dependency:
+      type: object
+      required: [id, dependency_type]
+      properties:
+        id:
+          type: string
+        version_id:
+          type: string
+          description: 目标版本（可空）
+        project_id:
+          type: string
+          description: 目标项目（可空）
+        dependency_type:
+          type: string
+          enum: [required, optional, incompatible, embedded]
+        file_name:
+          type: string
+          description: embedded 依赖的展示文件名
     SearchResponse:
       type: object
       required: [hits, offset, limit, total_hits]

@@ -245,6 +245,12 @@ paths:
           description: 已保存
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "413":
+          description: 超出存储配额（QuotaExceededException）
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
   /cape/{name}:
     get:
       operationId: getCape
@@ -719,6 +725,18 @@ paths:
                 $ref: "#/components/schemas/SkinLibItem"
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          description: 玩家或皮肤不存在
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
+        "413":
+          description: 超出发布数量配额
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
   /skinlib/{id}:
     get:
       operationId: getSkinlibItem

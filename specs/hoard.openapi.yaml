@@ -648,6 +648,40 @@ paths:
           description: 非 owner/admin
         "404":
           $ref: "#/components/responses/Error"
+  /api/mods/{id}/icon:
+    get:
+      operationId: getModIconApi
+      tags: [project]
+      summary: 项目 icon 直出（jar 内解析；无 icon 时 404）
+      parameters:
+        - $ref: "#/components/parameters/ProjectID"
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/Error"
+  /v2/project/{id}/icon:
+    get:
+      operationId: getProjectIcon
+      tags: [project]
+      summary: 项目 icon 直出（/api/mods/{id}/icon 的 v2 别名）
+      parameters:
+        - $ref: "#/components/parameters/ProjectID"
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/Error"
   /v2/project/{id}/version:
     get:
       operationId: getProjectVersions
@@ -879,6 +913,17 @@ components:
         team:
           type: string
           description: 归属团队 id（存量管理员上传为空）
+        license:
+          type: string
+          description: 从 jar 元数据解析（fabric/quilt/forge/neoforge）
+        icon_url:
+          type: string
+          description: icon 直出 URL（jar 内解析所得；无 icon 时缺省）
+        metadata_flags:
+          type: array
+          description: 表单与 jar 元数据冲突标旗（title/description/loader/game_versions_mismatch）
+          items:
+            type: string
         slug:
           type: string
         title:

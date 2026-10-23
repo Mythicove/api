@@ -17,6 +17,7 @@ tags:
   - name: version
   - name: tag
   - name: admin
+  - name: auth
 paths:
   /healthz:
     get:
@@ -25,6 +26,68 @@ paths:
       responses:
         "200":
           description: OK
+  /auth/oidc/login:
+    get:
+      operationId: oidcLogin
+      tags: [auth]
+      summary: 发起 OIDC 登录（302 跳转 IdP 授权端点；state/nonce 存短期 httpOnly cookie）
+      responses:
+        "302":
+          description: 跳转授权端点
+        "404":
+          description: 未配置 OIDC
+  /auth/oidc/callback:
+    get:
+      operationId: oidcCallback
+      tags: [auth]
+      summary: OIDC 回调（校验 state/nonce → 换 token → upsert 用户投影 → 设会话 cookie）
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "302":
+          description: 登录成功，跳回站点根
+        "400":
+          description: state 不匹配或缺参
+        "403":
+          description: 用户拒绝授权
+        "502":
+          description: token 交换或 ID token 校验失败
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: 登出（删除服务端会话并清 cookie）
+      responses:
+        "204":
+          description: 已登出
+  /auth/me:
+    get:
+      operationId: me
+      tags: [auth]
+      summary: 当前登录用户投影
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: 未登录
   /v2/search:
     get:
       operationId: search
@@ -421,6 +484,22 @@ components:
       properties:
         error:
           type: string
+    User:
+      type: object
+      required: [sub, username, email, avatar_url, role]
+      properties:
+        sub:
+          type: string
+          description: OIDC subject（Mirror 用户 ID）
+        username:
+          type: string
+        email:
+          type: string
+        avatar_url:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
     SearchResponse:
       type: object
       required: [hits, offset, limit, total_hits]

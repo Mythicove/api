@@ -88,6 +88,205 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           description: 未登录
+  /api/team:
+    post:
+      operationId: createTeam
+      tags: [auth]
+      summary: 创建团队（调用者成为 owner）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        "401":
+          description: 未登录
+  /api/user/teams:
+    get:
+      operationId: listMyTeams
+      tags: [auth]
+      summary: 我所在的团队
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserTeam"
+        "401":
+          description: 未登录
+  /api/team/{id}/members:
+    get:
+      operationId: listTeamMembers
+      tags: [auth]
+      summary: 团队成员列表（公开）
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamMember"
+        "404":
+          description: 团队不存在
+    post:
+      operationId: addTeamMember
+      tags: [auth]
+      summary: 添加/变更成员（owner 或站点 admin）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub]
+              properties:
+                sub:
+                  type: string
+                role:
+                  type: string
+                  enum: [owner, member]
+                  default: member
+      responses:
+        "204":
+          description: 已添加
+        "403":
+          description: 非 owner/admin
+        "404":
+          description: 团队或用户不存在
+  /api/team/{id}/members/{sub}:
+    delete:
+      operationId: removeTeamMember
+      tags: [auth]
+      summary: 移除成员（owner/admin）或自己退出
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+        - name: sub
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已移除
+        "403":
+          description: 无权
+        "404":
+          description: 不存在
+  /api/user/pats:
+    get:
+      operationId: listPATs
+      tags: [auth]
+      summary: 我的个人访问令牌（元数据，不含明文）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PAT"
+        "401":
+          description: 未登录
+    post:
+      operationId: createPAT
+      tags: [auth]
+      summary: 创建 PAT；明文 token 仅在本次响应返回一次
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                scopes:
+                  type: array
+                  items:
+                    type: string
+                expires_in_days:
+                  type: integer
+                  description: 省略或 0 表示永不过期
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  token:
+                    type: string
+                    description: 明文（mhp_ 前缀），仅此一次
+        "400":
+          description: name 缺失
+        "401":
+          description: 未登录
+  /api/user/pats/{id}:
+    delete:
+      operationId: deletePAT
+      tags: [auth]
+      summary: 撤销 PAT（立即失效）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已撤销
+        "401":
+          description: 未登录
+        "404":
+          description: 不存在或不属于当前用户
   /v2/search:
     get:
       operationId: search
@@ -463,12 +662,28 @@ components:
       type: http
       scheme: bearer
       description: HOARD_ADMIN_TOKEN
+    patAuth:
+      type: http
+      scheme: bearer
+      description: 个人访问令牌（mhp_ 前缀，明文仅创建时返回一次）
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: hoard_session
+      description: SSO 会话（httpOnly cookie，经 /auth/oidc/* 建立）
   parameters:
     ProjectID:
       name: id
       in: path
       required: true
       description: 项目 id 或 slug
+      schema:
+        type: string
+    TeamID:
+      name: id
+      in: path
+      required: true
+      description: 团队 id
       schema:
         type: string
   responses:
@@ -500,6 +715,52 @@ components:
         role:
           type: string
           enum: [user, admin]
+    TeamMember:
+      type: object
+      required: [team_id, user_sub, username, role, created_at]
+      properties:
+        team_id:
+          type: string
+        user_sub:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+        created_at:
+          type: string
+    UserTeam:
+      type: object
+      required: [team_id, name, role, created_at]
+      properties:
+        team_id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+        created_at:
+          type: string
+    PAT:
+      type: object
+      required: [id, name, scopes, created_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        expires_at:
+          type: string
+        last_used:
+          type: string
+        created_at:
+          type: string
     SearchResponse:
       type: object
       required: [hits, offset, limit, total_hits]
@@ -521,6 +782,9 @@ components:
       properties:
         id:
           type: string
+        team:
+          type: string
+          description: 归属团队 id（存量管理员上传为空）
         slug:
           type: string
         title:

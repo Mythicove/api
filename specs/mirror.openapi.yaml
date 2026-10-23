@@ -658,8 +658,21 @@ paths:
   /skinlib:
     get:
       operationId: listSkinlib
-      summary: 皮肤库列表
+      summary: 皮肤库列表（搜索/排序/分页）
       parameters:
+        - name: q
+          in: query
+          required: false
+          description: 关键词（匹配玩家名/描述）
+          schema:
+            type: string
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [newest, likes]
+            default: newest
         - name: offset
           in: query
           required: false
@@ -672,15 +685,14 @@ paths:
           schema:
             type: integer
             default: 20
+            maximum: 100
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SkinLibItem"
+                $ref: "#/components/schemas/SkinLibPage"
     post:
       operationId: publishSkin
       summary: 把玩家当前皮肤发布到皮肤库
@@ -706,6 +718,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/SkinLibItem"
         "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib/{id}:
+    get:
+      operationId: getSkinlibItem
+      summary: 皮肤库条目详情
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkinLibItem"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib/{id}/comments:
+    get:
+      operationId: listSkinComments
+      summary: 条目评论列表（时间升序）
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkinComment"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib/{id}/apply:
+    post:
+      operationId: applySkin
+      summary: 把皮肤库条目应用到自己名下的玩家
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerName]
+              properties:
+                playerName:
+                  type: string
+      responses:
+        "204":
+          description: 已应用
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
           $ref: "./common.yaml#/components/responses/Error"
   /skinlib/{id}/like:
     post:
@@ -957,6 +1026,23 @@ paths:
           description: OK
         "403":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/comments/{cid}:
+    delete:
+      operationId: adminDeleteComment
+      summary: 删除皮肤库评论（审核）
+      security:
+        - adminToken: []
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
   /admin/batch-import:
     post:
       operationId: adminBatchImport
@@ -1032,7 +1118,7 @@ components:
           type: string
     SkinLibItem:
       type: object
-      required: [id, owner_user_id, player_name, texture_key, description, model, likes]
+      required: [id, owner_user_id, player_name, texture_key, description, model, likes, created_at]
       properties:
         id:
           type: string
@@ -1049,6 +1135,41 @@ components:
           enum: [default, slim]
         likes:
           type: integer
+        created_at:
+          type: string
+          description: RFC3339 时间戳
+    SkinLibPage:
+      type: object
+      required: [items, total, offset, limit]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkinLibItem"
+        total:
+          type: integer
+          format: int64
+        offset:
+          type: integer
+        limit:
+          type: integer
+    SkinComment:
+      type: object
+      required: [id, item_id, user_id, author_name, content, created_at]
+      properties:
+        id:
+          type: string
+        item_id:
+          type: string
+        user_id:
+          type: string
+        author_name:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+          description: RFC3339 时间戳
     AdminUser:
       type: object
       required: [id, email, nickname, role, status, verified, created_at, player_names]

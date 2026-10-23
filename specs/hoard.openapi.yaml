@@ -538,6 +538,82 @@ paths:
                 format: binary
         "404":
           $ref: "#/components/responses/Error"
+  /v2/project:
+    post:
+      operationId: createUserProject
+      tags: [project]
+      summary: 用户级创建项目（Modrinth 形 multipart：data JSON + file；自动建团队并归属）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data, file]
+              properties:
+                data:
+                  type: string
+                  description: JSON（title/description/body/project_type/client_side/server_side/loaders[]/game_versions[]/categories[]/version_name/version_number/version_type/changelog）
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: PAT 缺 UPLOAD scope
+        "413":
+          $ref: "#/components/responses/Error"
+  /v2/version:
+    post:
+      operationId: createUserVersion
+      tags: [version]
+      summary: 用户级发版（multipart：data JSON 含 project_id + file；须为项目团队成员）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data, file]
+              properties:
+                data:
+                  type: string
+                  description: JSON（project_id/name/version_number/version_type/changelog/loaders[]/game_versions[]）
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Version"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: 非团队成员或 PAT 缺 UPLOAD scope
+        "404":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
   /v2/project/{id}:
     get:
       operationId: getProject
@@ -552,6 +628,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/Error"
+    delete:
+      operationId: deleteUserProject
+      tags: [project]
+      summary: 删除项目（团队 owner 或站点 admin）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ProjectID"
+      responses:
+        "204":
+          description: 已删除
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          description: 非 owner/admin
         "404":
           $ref: "#/components/responses/Error"
   /v2/project/{id}/version:

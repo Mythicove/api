@@ -1043,6 +1043,43 @@ paths:
           description: OK
         "403":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/audit:
+    get:
+      operationId: adminListAudit
+      summary: 管理操作审计日志（时间倒序）
+      security:
+        - adminToken: []
+      parameters:
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, total]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+                  total:
+                    type: integer
+                    format: int64
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
   /admin/batch-import:
     post:
       operationId: adminBatchImport
@@ -1166,6 +1203,26 @@ components:
         author_name:
           type: string
         content:
+          type: string
+        created_at:
+          type: string
+          description: RFC3339 时间戳
+    AuditEntry:
+      type: object
+      required: [id, actor, actor_ip, action, target, detail, created_at]
+      properties:
+        id:
+          type: string
+        actor:
+          type: string
+          description: '"token" 或 "user:<id>"'
+        actor_ip:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        detail:
           type: string
         created_at:
           type: string

@@ -1,8 +1,13 @@
 openapi: 3.1.0
 info:
   title: Mythic Mirror API
-  version: 0.1.0
-  description: 皮肤站契约，对齐 authlib-injector 的 Yggdrasil 服务端规范。
+  version: 0.2.0
+  description: |
+    皮肤站契约，对齐 authlib-injector 的 Yggdrasil 服务端规范，外加账号体系、皮肤库与管理后台。
+
+    本契约只描述当前后端真正实现的路由（受 mythic-mirror 仓库的 spec 漂移测试保护）。
+    OIDC Provider 端点（/oauth2/*、/.well-known/*）遵循 OAuth2/OIDC 标准，
+    自描述见 /.well-known/openid-configuration，暂不在本契约中重复建模。
 servers:
   - url: /
 paths:
@@ -208,6 +213,38 @@ paths:
               schema:
                 type: string
                 format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+    post:
+      operationId: uploadSkin
+      summary: 上传皮肤（PNG 原始字节）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [default, slim]
+            default: default
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "204":
+          description: 已保存
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
   /cape/{name}:
     get:
       operationId: getCape
@@ -226,7 +263,52 @@ paths:
               schema:
                 type: string
                 format: binary
-  /avatar/{uuid}:
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+    post:
+      operationId: uploadCape
+      summary: 上传披风（PNG 原始字节）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "204":
+          description: 已保存
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /textures/{key}:
+    get:
+      operationId: getTexture
+      summary: 按存储键取纹理原图
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /avatars/{uuid}:
     get:
       operationId: getAvatar
       summary: crafatar 兼容 2D 头像
@@ -236,6 +318,13 @@ paths:
           required: true
           schema:
             type: string
+        - name: size
+          in: query
+          required: false
+          description: 头像边长（像素）
+          schema:
+            type: integer
+            default: 128
       responses:
         "200":
           description: 头像 PNG
@@ -244,8 +333,771 @@ paths:
               schema:
                 type: string
                 format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /renders/head/{uuid}:
+    get:
+      operationId: getHeadRender
+      summary: 2D 头部渲染
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /renders/body/{uuid}:
+    get:
+      operationId: getBodyRender
+      summary: 2D 全身渲染
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /usm/{uuid}:
+    get:
+      operationId: getUSM
+      summary: USM（统一皮肤材质）端点
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /MinecraftSkins/{name}:
+    get:
+      operationId: getLegacySkin
+      summary: 旧版皮肤直链（兼容 CSL 等）
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 皮肤 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /MinecraftCloaks/{name}:
+    get:
+      operationId: getLegacyCape
+      summary: 旧版披风直链（兼容 CSL 等）
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 披风 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /healthz:
+    get:
+      operationId: healthz
+      summary: 健康检查
+      responses:
+        "200":
+          description: OK
+  /account/register:
+    post:
+      operationId: register
+      summary: 注册账号（发送验证邮件）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+        "409":
+          $ref: "./common.yaml#/components/responses/Error"
+  /account/verify:
+    post:
+      operationId: verifyEmail
+      summary: 用邮件中的 token 验证邮箱
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "204":
+          description: 已验证
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /account/forgot-password:
+    post:
+      operationId: forgotPassword
+      summary: 发送密码重置邮件（不泄露账号是否存在）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+      responses:
+        "204":
+          description: OK
+  /account/reset-password:
+    post:
+      operationId: resetPassword
+      summary: 用重置 token 设置新密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        "204":
+          description: OK
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /account/players:
+    post:
+      operationId: addPlayer
+      summary: 为当前账号添加玩家名
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: 已创建
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Player"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "409":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth/{provider}/auth:
+    get:
+      operationId: oauthAuth
+      summary: 跳转到第三方 OAuth 授权页
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          description: 登录完成后的前端回跳 URL
+          schema:
+            type: string
+      responses:
+        "302":
+          description: 跳转到授权页
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth/{provider}/callback:
+    get:
+      operationId: oauthCallback
+      summary: OAuth 回调（state 为 URL 时 302 回跳并在 hash 携带 accessToken）
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 无回跳 URL 时直接返回 token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+        "302":
+          description: 回跳前端
+  /mojang/oauth/auth:
+    get:
+      operationId: mojangOauthAuth
+      summary: 获取 Microsoft 正版绑定授权 URL
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /mojang/oauth/callback:
+    get:
+      operationId: mojangOauthCallback
+      summary: Microsoft 正版绑定回调
+      parameters:
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已绑定
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /mojang/verify:
+    post:
+      operationId: mojangVerify
+      summary: 正版账号验证
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib:
+    get:
+      operationId: listSkinlib
+      summary: 皮肤库列表
+      parameters:
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SkinLibItem"
+    post:
+      operationId: publishSkin
+      summary: 把玩家当前皮肤发布到皮肤库
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [playerName]
+              properties:
+                playerName:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: 已发布
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkinLibItem"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib/{id}/like:
+    post:
+      operationId: likeSkin
+      summary: 点赞皮肤
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: OK
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skinlib/{id}/comment:
+    post:
+      operationId: commentSkin
+      summary: 评论皮肤
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "204":
+          description: OK
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/login-methods:
+    get:
+      operationId: getLoginMethods
+      summary: 登录方式注册表（供前端渲染登录按钮）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoginMethod"
+  /api/announcement:
+    get:
+      operationId: getAnnouncement
+      summary: 站点公告
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Announcement"
+  /api/admin/users:
+    get:
+      operationId: adminListUsers
+      summary: 用户列表
+      security:
+        - adminToken: []
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+                  total:
+                    type: integer
+                    format: int64
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/users/{id}:
+    patch:
+      operationId: adminUpdateUser
+      summary: 更新用户角色/状态
+      security:
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [user, admin]
+                status:
+                  type: string
+                  enum: [active, banned, suspended]
+      responses:
+        "204":
+          description: OK
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/login-methods:
+    get:
+      operationId: adminGetLoginMethods
+      summary: 登录方式（管理视图）
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LoginMethod"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    put:
+      operationId: adminSetLoginMethods
+      summary: 保存登录方式开关/顺序
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [methods]
+              properties:
+                methods:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/LoginMethod"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/announcement:
+    get:
+      operationId: adminGetAnnouncement
+      summary: 公告（管理视图）
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Announcement"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    put:
+      operationId: adminSetAnnouncement
+      summary: 设置公告
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Announcement"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/invite-codes:
+    post:
+      operationId: adminGenerateInviteCodes
+      summary: 生成邀请码（1–100 个）
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [count]
+              properties:
+                count:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/skinlib/{id}:
+    delete:
+      operationId: adminDeleteSkinlibItem
+      summary: 删除皮肤库条目（审核）
+      security:
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /admin/batch-import:
+    post:
+      operationId: adminBatchImport
+      summary: 批量导入用户（随机密码，需管理员 token）
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [users]
+              properties:
+                users:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+                      nickname:
+                        type: string
+                      playerName:
+                        type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  imported:
+                    type: integer
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Yggdrasil accessToken（会话）
+    adminToken:
+      type: http
+      scheme: bearer
+      description: MIRROR_ADMIN_TOKEN
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, playerName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        nickname:
+          type: string
+        playerName:
+          type: string
+        captchaToken:
+          type: string
+        inviteCode:
+          type: string
+    SkinLibItem:
+      type: object
+      required: [id, owner_user_id, player_name, texture_key, description, model, likes]
+      properties:
+        id:
+          type: string
+        owner_user_id:
+          type: string
+        player_name:
+          type: string
+        texture_key:
+          type: string
+        description:
+          type: string
+        model:
+          type: string
+          enum: [default, slim]
+        likes:
+          type: integer
+    AdminUser:
+      type: object
+      required: [id, email, nickname, role, status, verified, created_at, player_names]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        nickname:
+          type: string
+        role:
+          type: string
+          enum: [user, admin]
+        status:
+          type: string
+          enum: [active, banned, suspended]
+        verified:
+          type: boolean
+        created_at:
+          type: string
+        player_names:
+          type: array
+          items:
+            type: string
+    LoginMethod:
+      type: object
+      required: [id, type, label, enabled, order]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [password, oauth]
+        label:
+          type: string
+        enabled:
+          type: boolean
+        order:
+          type: integer
+    Announcement:
+      type: object
+      required: [title, body, enabled]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        enabled:
+          type: boolean
     Meta:
       type: object
       properties:
@@ -359,6 +1211,7 @@ components:
           type: boolean
     AuthenticateResponse:
       type: object
+      required: [accessToken, clientToken, availableProfiles]
       properties:
         accessToken:
           type: string

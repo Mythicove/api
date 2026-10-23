@@ -1098,6 +1098,187 @@ paths:
                     format: int64
         "403":
           $ref: "./common.yaml#/components/responses/Error"
+  /reports:
+    post:
+      operationId: createReport
+      summary: 举报皮肤条目或评论（登录用户；同一目标仅一次）
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetType, targetID]
+              properties:
+                targetType:
+                  type: string
+                  enum: [skin, comment]
+                targetID:
+                  type: string
+                reason:
+                  type: string
+                  maxLength: 1000
+      responses:
+        "204":
+          description: 已受理
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          description: 目标不存在
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
+        "409":
+          description: 重复举报
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
+  /api/admin/reports:
+    get:
+      operationId: adminListReports
+      summary: 举报列表（pending 优先；status 过滤 pending|dismissed|acted，空=全部）
+      security:
+        - adminToken: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reports, total]
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Report"
+                  total:
+                    type: integer
+                    format: int64
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/reports/{id}/resolve:
+    post:
+      operationId: adminResolveReport
+      summary: 标记举报处理结果（删除目标内容复用 skinlib/comments DELETE 端点）
+      security:
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [dismissed, acted]
+      responses:
+        "204":
+          description: 已处理
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/skins:
+    get:
+      operationId: adminListSkins
+      summary: 管理端皮肤列表（status 过滤 listed|under_review|unlisted，空=全部）
+      security:
+        - adminToken: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SkinLibItem"
+                  total:
+                    type: integer
+                    format: int64
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/skins/{id}/status:
+    post:
+      operationId: adminSetSkinStatus
+      summary: 设置皮肤条目状态（批准上架/下架/退回审核）
+      security:
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [listed, unlisted, under_review]
+      responses:
+        "204":
+          description: 已更新
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /admin/batch-import:
     post:
       operationId: adminBatchImport
@@ -1173,7 +1354,7 @@ components:
           type: string
     SkinLibItem:
       type: object
-      required: [id, owner_user_id, player_name, texture_key, description, model, likes, created_at]
+      required: [id, owner_user_id, player_name, texture_key, description, model, likes, status, created_at]
       properties:
         id:
           type: string
@@ -1190,9 +1371,40 @@ components:
           enum: [default, slim]
         likes:
           type: integer
+        status:
+          type: string
+          enum: [listed, under_review, unlisted]
         created_at:
           type: string
           description: RFC3339 时间戳
+    Report:
+      type: object
+      required: [id, reporter_user_id, reporter_name, target_type, target_id, reason, status, reviewed_by, created_at]
+      properties:
+        id:
+          type: string
+        reporter_user_id:
+          type: string
+        reporter_name:
+          type: string
+        target_type:
+          type: string
+          enum: [skin, comment]
+        target_id:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, dismissed, acted]
+        reviewed_by:
+          type: string
+        created_at:
+          type: string
+          description: RFC3339 时间戳
+        reviewed_at:
+          type: string
+          description: RFC3339 时间戳（未处理时缺省）
     SkinLibPage:
       type: object
       required: [items, total, offset, limit]

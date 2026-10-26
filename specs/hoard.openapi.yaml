@@ -955,7 +955,11 @@ components:
     adminToken:
       type: http
       scheme: bearer
-      description: HOARD_ADMIN_TOKEN
+      description: |
+        管理端点（tags: admin）接受两种等价凭据：
+        1) `HOARD_ADMIN_TOKEN` 静态令牌，经 `Authorization: Bearer` 传递（bootstrap/救援通道）；
+        2) `role=admin` 的登录态——`hoard_session` cookie 或 `mhp_` PAT（此时无需该头）。
+        fail closed：未配置静态令牌时管理端点不再对所有人开放，只有 admin 会话能通过。
     patAuth:
       type: http
       scheme: bearer

@@ -1690,7 +1690,7 @@ components:
             type: string
     RegisterRequirements:
       type: object
-      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, minPasswordLength, emailDomains]
+      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, captchaCapUrl, minPasswordLength, emailDomains]
       properties:
         registrationDisabled:
           type: boolean
@@ -1698,9 +1698,12 @@ components:
           type: boolean
         captcha:
           type: string
-          description: turnstile | recaptcha | hcaptcha | 空串（不启用）
+          description: turnstile | recaptcha | hcaptcha | cap | 空串（不启用）
         captchaSiteKey:
           type: string
+        captchaCapUrl:
+          type: string
+          description: cap driver 的 Standalone 实例公网地址（前端加载控件用）；其余 driver 为空串
         minPasswordLength:
           type: integer
           description: 密码最小长度（与后端 account.MinPasswordLength 同源）

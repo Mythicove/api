@@ -720,7 +720,12 @@ paths:
   /oauth/{provider}/callback:
     get:
       operationId: oauthCallback
-      summary: OAuth 回调（state 为 URL 时 302 回跳并在 hash 携带 accessToken）
+      summary: OAuth 回调（state 为 URL 时 302 回跳，query 携带一次性 oauth_code）
+      description: |
+        回跳不再在 URL fragment 里携带会话令牌（令牌会留在浏览历史且落地页脚本可读）。
+        改为发放一次性、短时效（60s、单次消费）的 `oauth_code`，由 web 的服务端路由
+        调 `POST /account/exchange-code` 兑换会话并直接落 httpOnly cookie。
+        失败时回跳带 `?oauth=error`。
       parameters:
         - name: provider
           in: path
@@ -748,7 +753,48 @@ paths:
                   accessToken:
                     type: string
         "302":
-          description: 回跳前端
+          description: 回跳前端（`?oauth_code=<一次性码>`，失败时 `?oauth=error`）
+  /account/exchange-code:
+    post:
+      operationId: exchangeOAuthCode
+      summary: 用一次性换取码兑换会话
+      description: |
+        调用方是 web 的服务端路由（BFF），不是浏览器。换取码单次消费，重放返回 401。
+        返回的 accessToken 由调用方写入 httpOnly cookie，不回浏览器 URL。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        "200":
+          description: 兑换成功
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accessToken]
+                properties:
+                  accessToken:
+                    type: string
+                  playerName:
+                    type: string
+                    description: 当前玩家名（无玩家时省略）
+                  playerId:
+                    type: string
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          description: 换取码无效、已过期或已被消费
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
   /mojang/oauth/auth:
     get:
       operationId: mojangOauthAuth

@@ -157,7 +157,10 @@ paths:
     post:
       operationId: addTeamMember
       tags: [auth]
-      summary: 添加/变更成员（owner 或站点 admin）
+      summary: 变更已有成员角色 / 移交所有权（owner 或站点 admin）
+      description: |
+        新增成员不走此端点——加入团队需被邀请人同意，请用 `POST /api/team/{id}/invites`。
+        对非成员调用返回 409。把唯一 owner 降级同样返回 409（须先移交所有权）。
       security:
         - sessionCookie: []
         - patAuth: []
@@ -179,11 +182,13 @@ paths:
                   default: member
       responses:
         "204":
-          description: 已添加
+          description: 角色已变更
         "403":
           description: 非 owner/admin
         "404":
           description: 团队或用户不存在
+        "409":
+          description: 目标不是成员（应改用邀请），或会把团队变成无 owner
   /api/team/{id}/members/{sub}:
     delete:
       operationId: removeTeamMember
@@ -206,6 +211,137 @@ paths:
           description: 无权
         "404":
           description: 不存在
+  /api/team/{id}/invites:
+    post:
+      operationId: inviteTeamMember
+      tags: [auth]
+      summary: 邀请用户加入团队（owner 或站点 admin）
+      description: 写入一条待处理邀请；被邀请人接受后才成为成员。重复邀请覆盖角色。
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub]
+              properties:
+                sub:
+                  type: string
+                role:
+                  type: string
+                  enum: [owner, member]
+                  default: member
+      responses:
+        "204":
+          description: 邀请已发出
+        "403":
+          description: 非 owner/admin
+        "404":
+          description: 团队或用户不存在
+        "409":
+          description: 目标已是成员
+    get:
+      operationId: listTeamInvites
+      tags: [auth]
+      summary: 团队的待处理邀请（owner 或站点 admin）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamInvite"
+        "403":
+          description: 非 owner/admin
+  /api/team/{id}/invites/{sub}:
+    delete:
+      operationId: revokeTeamInvite
+      tags: [auth]
+      summary: 撤回待处理邀请（owner 或站点 admin）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - $ref: "#/components/parameters/TeamID"
+        - name: sub
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已撤回
+        "403":
+          description: 无权
+        "404":
+          description: 邀请不存在
+  /api/user/invites:
+    get:
+      operationId: listMyTeamInvites
+      tags: [auth]
+      summary: 我收到的待处理团队邀请
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserInvite"
+  /api/user/invites/{teamId}/accept:
+    post:
+      operationId: acceptTeamInvite
+      tags: [auth]
+      summary: 接受邀请（成为成员，邀请随即消费）
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已接受
+        "404":
+          description: 无此待处理邀请
+  /api/user/invites/{teamId}:
+    delete:
+      operationId: rejectTeamInvite
+      tags: [auth]
+      summary: 拒绝邀请
+      security:
+        - sessionCookie: []
+        - patAuth: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已拒绝
+        "404":
+          description: 无此待处理邀请
   /api/user/pats:
     get:
       operationId: listPATs
@@ -886,6 +1022,41 @@ components:
         role:
           type: string
           enum: [owner, member]
+        created_at:
+          type: string
+    TeamInvite:
+      type: object
+      description: 管理者视角的待处理邀请
+      required: [team_id, user_sub, username, role, invited_by, created_at]
+      properties:
+        team_id:
+          type: string
+        user_sub:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+        invited_by:
+          type: string
+          description: 邀请人 sub；以静态管理令牌操作时为空串
+        created_at:
+          type: string
+    UserInvite:
+      type: object
+      description: 被邀请人视角的待处理邀请
+      required: [team_id, team_name, role, invited_by, created_at]
+      properties:
+        team_id:
+          type: string
+        team_name:
+          type: string
+        role:
+          type: string
+          enum: [owner, member]
+        invited_by:
+          type: string
         created_at:
           type: string
     UserTeam:

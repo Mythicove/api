@@ -341,6 +341,32 @@ paths:
                 format: binary
         "404":
           $ref: "./common.yaml#/components/responses/Error"
+  /avatars/by-name/{name}:
+    get:
+      operationId: getAvatarByName
+      summary: 按玩家名出 2D 头像（列表/评论等仅有名字的场景）
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 128
+      responses:
+        "200":
+          description: 头像 PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /renders/head/{uuid}:
     get:
       operationId: getHeadRender
@@ -533,6 +559,22 @@ paths:
         "400":
           $ref: "./common.yaml#/components/responses/Error"
   /account/players:
+    get:
+      operationId: listPlayers
+      summary: 当前账号名下玩家列表
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Player"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
     post:
       operationId: addPlayer
       summary: 为当前账号添加玩家名
@@ -828,6 +870,17 @@ paths:
           description: OK
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/register-requirements:
+    get:
+      operationId: registerRequirements
+      summary: 注册前置要求（邀请码/验证码开关），前端据此渲染控件
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterRequirements"
   /api/login-methods:
     get:
       operationId: getLoginMethods
@@ -1068,6 +1121,12 @@ paths:
       security:
         - adminToken: []
       parameters:
+        - name: q
+          in: query
+          required: false
+          description: 按 action/actor/target 模糊过滤
+          schema:
+            type: string
         - name: offset
           in: query
           required: false
@@ -1479,6 +1538,27 @@ components:
           type: string
         player_names:
           type: array
+          items:
+            type: string
+    RegisterRequirements:
+      type: object
+      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, minPasswordLength, emailDomains]
+      properties:
+        registrationDisabled:
+          type: boolean
+        inviteOnly:
+          type: boolean
+        captcha:
+          type: string
+          description: turnstile | recaptcha | hcaptcha | 空串（不启用）
+        captchaSiteKey:
+          type: string
+        minPasswordLength:
+          type: integer
+          description: 密码最小长度（与后端 account.MinPasswordLength 同源）
+        emailDomains:
+          type: array
+          description: 允许的邮箱域名；空数组表示不限制
           items:
             type: string
     LoginMethod:

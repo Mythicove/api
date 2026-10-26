@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Mythic Hoard API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     Mod 托管契约。读端点对齐 Modrinth API v2 的**已实现子集**，字段名与 Modrinth 保持一致，
     以让 Prism Launcher / ferium / packwiz 等客户端接入。
@@ -347,6 +347,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchResponse"
+  /api/mods/facets:
+    get:
+      operationId: modFacets
+      tags: [search]
+      summary: 可选过滤维度（loaders/game_versions/categories）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FacetOptions"
   /api/mods:
     get:
       operationId: listMods
@@ -925,6 +937,22 @@ components:
         file_name:
           type: string
           description: embedded 依赖的展示文件名
+    FacetOptions:
+      type: object
+      required: [loaders, game_versions, categories]
+      properties:
+        loaders:
+          type: array
+          items:
+            type: string
+        game_versions:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
     SearchResponse:
       type: object
       required: [hits, offset, limit, total_hits]

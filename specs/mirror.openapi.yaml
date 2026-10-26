@@ -678,6 +678,24 @@ paths:
           $ref: "./common.yaml#/components/responses/Error"
         "404":
           $ref: "./common.yaml#/components/responses/Error"
+  /account/players/{name}/premium:
+    delete:
+      operationId: unbindPremium
+      summary: 解除微软正版绑定
+      description: |
+        清空该玩家的 premium_uuid，回到离线身份：此后可以本地改名，贴图不再回退 Mojang。
+        幂等——未绑定时同样返回 204。
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PlayerName"
+      responses:
+        "204":
+          description: 已解绑（或本就未绑定）
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /oauth/{provider}/auth:
     get:
       operationId: oauthAuth
@@ -1784,6 +1802,9 @@ components:
         active:
           type: boolean
           description: 是否为账号当前选用的玩家（建会话时优先使用）
+        premium:
+          type: boolean
+          description: 是否已绑定微软正版（绑定后不可本地改名）
     AuthenticateResponse:
       type: object
       required: [accessToken, clientToken, availableProfiles]

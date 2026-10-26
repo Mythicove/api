@@ -1479,6 +1479,67 @@ paths:
           $ref: "./common.yaml#/components/responses/Error"
         "404":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/oauth-clients:
+    get:
+      operationId: adminListOAuthClients
+      summary: 列出 OIDC 客户端
+      description: |
+        返回存储态客户端，含 `secret_hash`（sha256 hex，非明文）与 `first_party` 标记。
+        读取者即能创建/轮换客户端的管理员，故不构成额外提权；但客户端密钥应使用高熵随机值，
+        以免哈希被离线爆破。
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OAuthClient"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    post:
+      operationId: adminSaveOAuthClient
+      summary: 新建或更新 OIDC 客户端（按 id upsert，整个对象覆盖）
+      description: |
+        按 `id` upsert：命中则**整条替换**，故更新时必须带上不想丢失的字段
+        （包括 `secret_hash`；省略即视为清空/转 public）。
+        `public: true` 时服务端强制清空 `secret_hash`。
+        `first_party: true` 的客户端授权时跳过前端同意页（用于同部署自有服务，如 Hoard）。
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OAuthClient"
+      responses:
+        "201":
+          description: 已保存（回显存储态）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OAuthClient"
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/oauth-clients/{id}:
+    delete:
+      operationId: adminDeleteOAuthClient
+      summary: 删除 OIDC 客户端
+      security:
+        - adminToken: []
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: 已删除
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
   /admin/batch-import:
     post:
       operationId: adminBatchImport
@@ -1712,6 +1773,34 @@ components:
           description: 允许的邮箱域名；空数组表示不限制
           items:
             type: string
+    OAuthClient:
+      type: object
+      required: [id, name, redirect_uris, grant_types, scopes, public]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        secret_hash:
+          type: string
+          description: 客户端密钥的 sha256 hex；public 客户端为空。服务端不存也不回传明文
+        redirect_uris:
+          type: array
+          items:
+            type: string
+        grant_types:
+          type: array
+          items:
+            type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        public:
+          type: boolean
+        first_party:
+          type: boolean
+          description: 同部署第一方服务（如 Hoard）；授权时免前端同意页
     LoginMethod:
       type: object
       required: [id, type, label, enabled, order]

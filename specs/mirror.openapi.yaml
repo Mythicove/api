@@ -1077,6 +1077,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Announcement"
+  /api/brand:
+    get:
+      operationId: getBrand
+      summary: 品牌图标配置（哪些变体被自定义 + 缓存版本号）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandConfig"
+  /api/brand/logo/{variant}:
+    get:
+      operationId: getBrandLogo
+      summary: 自定义品牌图标字节（未自定义时 404，前端回落内置默认图）
+      parameters:
+        - name: variant
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [light, dark]
+      responses:
+        "200":
+          description: PNG 字节
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /api/admin/users:
     get:
       operationId: adminListUsers
@@ -1214,6 +1246,65 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/Announcement"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/brand:
+    get:
+      operationId: adminGetBrand
+      summary: 品牌图标配置（管理视图）
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandConfig"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/brand/logo/{variant}:
+    put:
+      operationId: adminSetBrandLogo
+      summary: 上传自定义品牌图标（请求体为原始 PNG 字节，≤1MiB）
+      security:
+        - adminToken: []
+      parameters:
+        - name: variant
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [light, dark]
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "204":
+          description: OK
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    delete:
+      operationId: adminDeleteBrandLogo
+      summary: 移除自定义品牌图标（回落内置默认图）
+      security:
+        - adminToken: []
+      parameters:
+        - name: variant
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [light, dark]
       responses:
         "204":
           description: OK
@@ -1871,6 +1962,19 @@ components:
           type: string
         enabled:
           type: boolean
+    BrandConfig:
+      type: object
+      required: [light, dark, version]
+      properties:
+        light:
+          type: boolean
+          description: 浅色图标是否被自定义
+        dark:
+          type: boolean
+          description: 深色图标是否被自定义
+        version:
+          type: integer
+          description: 变更版本号，前端用作缓存击穿查询串
     Meta:
       type: object
       properties:

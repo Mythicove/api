@@ -1,19 +1,21 @@
 # Mythicove API
 
-Mythicove 生态的统一 OpenAPI 契约仓库——作为 **单一事实源（single source of truth）**，同时生成 Go server（`oapi-codegen`）与 TypeScript client（`openapi-typescript`）。
+**English** | [简体中文](./README.zh-CN.md)
 
-## 约定
+Unified OpenAPI contract repository for the Mythicove ecosystem — the **single source of truth** that generates both the Go server (`oapi-codegen`) and the TypeScript client (`openapi-typescript`).
 
-- 每个产品一个 spec 文件：`specs/mirror.openapi.yaml`、`specs/hoard.openapi.yaml`（后续 `isles`/`atlas`/`compass` 同理）。
-- 公共模型（账号、分页、错误响应）抽到 `specs/common.yaml`，用 `$ref` 复用。
-- 以 **OpenAPI 3.1** 起步。
-- 改 spec 即改契约：两端代码由 CI 从本仓库生成，不手写生成物。
+## Conventions
 
-## 目录
+- One spec file per product: `specs/mirror.openapi.yaml`, `specs/hoard.openapi.yaml` (future `isles`/`atlas`/`compass` follow the same pattern).
+- Shared models (accounts, pagination, error responses) live in `specs/common.yaml`, reused via `$ref`.
+- Starting from **OpenAPI 3.1**.
+- Changing the spec means changing the contract: code on both ends is generated from this repository by CI — never hand-edit generated artifacts.
 
-- `specs/` — 各产品 OpenAPI 契约
-- `codegen/` — 代码生成脚本 / 配置（待建）
+## Layout
 
-## 许可证
+- `specs/` — per-product OpenAPI contracts
+- `codegen/` — code generation scripts / config (to be added)
 
-契约与生成物采用 [MIT](https://opensource.org/license/mit)（SDK/契约类资产走 MIT，便于第三方启动器与工具接入）。
+## License
+
+Contracts and generated artifacts are [MIT](https://opensource.org/license/mit) — SDK/contract assets use MIT so third-party launchers and tools can integrate easily.

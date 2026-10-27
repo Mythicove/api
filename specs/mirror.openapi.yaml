@@ -1226,6 +1226,43 @@ paths:
                 format: binary
         "404":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/site:
+    get:
+      operationId: getSite
+      summary: 站点身份文本 + 自定义资产是否存在（前端据此挂 link/script 与渲染备案/版权）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SitePublic"
+  /site/custom.css:
+    get:
+      operationId: getSiteCustomCSS
+      summary: 自定义 CSS（同源文件下发以兼容 CSP；未设置 404）
+      responses:
+        "200":
+          description: CSS 文本
+          content:
+            text/css:
+              schema:
+                type: string
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /site/custom.js:
+    get:
+      operationId: getSiteCustomJS
+      summary: 自定义 JS（同源文件下发以兼容 CSP；未设置 404）
+      responses:
+        "200":
+          description: JS 文本
+          content:
+            application/javascript:
+              schema:
+                type: string
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /api/admin/users:
     get:
       operationId: adminListUsers
@@ -1472,6 +1509,39 @@ paths:
       responses:
         "204":
           description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/site:
+    get:
+      operationId: adminGetSite
+      summary: 站点信息与自定义资产（管理视图）
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteAdmin"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    put:
+      operationId: adminSetSite
+      summary: 设置站点信息与自定义 CSS/JS
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteAdmin"
+      responses:
+        "204":
+          description: OK
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
         "403":
           $ref: "./common.yaml#/components/responses/Error"
   /api/admin/invite-codes:
@@ -2220,6 +2290,51 @@ components:
         version:
           type: integer
           description: 变更版本号，前端用作缓存击穿查询串
+    SiteInfo:
+      type: object
+      required: [name, description, copyright, icp]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        copyright:
+          type: string
+        icp:
+          type: string
+          description: 备案展示文本（中国部署）
+    SiteAssets:
+      type: object
+      required: [customCss, customJs]
+      properties:
+        customCss:
+          type: string
+        customJs:
+          type: string
+    SitePublic:
+      type: object
+      required: [name, description, copyright, icp, customCss, customJs]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        copyright:
+          type: string
+        icp:
+          type: string
+        customCss:
+          type: boolean
+        customJs:
+          type: boolean
+    SiteAdmin:
+      type: object
+      required: [info, assets]
+      properties:
+        info:
+          $ref: "#/components/schemas/SiteInfo"
+        assets:
+          $ref: "#/components/schemas/SiteAssets"
     Meta:
       type: object
       properties:

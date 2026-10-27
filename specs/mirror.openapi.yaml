@@ -1452,6 +1452,37 @@ paths:
           description: OK
         "403":
           $ref: "./common.yaml#/components/responses/Error"
+  /api/admin/registration:
+    get:
+      operationId: adminGetRegistration
+      summary: 注册与验证策略（关注册/仅邀请/邮箱白名单/验证码范围）
+      security:
+        - adminToken: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegistrationPolicy"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+    put:
+      operationId: adminSetRegistration
+      summary: 设置注册与验证策略（唯一来源；旧环境变量已废弃，仅升级时播种）
+      security:
+        - adminToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegistrationPolicy"
+      responses:
+        "204":
+          description: OK
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
   /api/admin/brand:
     get:
       operationId: adminGetBrand
@@ -2335,6 +2366,24 @@ components:
           $ref: "#/components/schemas/SiteInfo"
         assets:
           $ref: "#/components/schemas/SiteAssets"
+    RegistrationPolicy:
+      type: object
+      required: [disableRegistration, inviteOnly, emailDomainWhitelist, captchaScopes]
+      properties:
+        disableRegistration:
+          type: boolean
+        inviteOnly:
+          type: boolean
+        emailDomainWhitelist:
+          type: array
+          description: 允许的邮箱域名；空数组=不限制
+          items:
+            type: string
+        captchaScopes:
+          type: array
+          description: 验证码保护范围（register | login）；空数组=不保护
+          items:
+            type: string
     Meta:
       type: object
       properties:

@@ -1,6 +1,6 @@
 # Contributing
 
-Canonical guide on the docs site: [English](https://mythicove.github.io/docs/en/community/contributing/) · [中文](https://mythicove.github.io/docs/community/contributing/)
+Canonical guide on the docs site: [English](https://docs.gov.skin/en/community/contributing/) · [中文](https://docs.gov.skin/community/contributing/)
 
 Repo-specific rule: edit the OpenAPI contract first, then regenerate — never hand-edit generated artifacts.
 

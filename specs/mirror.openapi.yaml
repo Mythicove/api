@@ -500,6 +500,34 @@ paths:
           $ref: "./common.yaml#/components/responses/Error"
         "409":
           $ref: "./common.yaml#/components/responses/Error"
+  /account/login:
+    post:
+      operationId: accountLogin
+      summary: web 登录（login scope 启用时强制验证码）
+      description: |
+        供 web BFF（`/api/auth/login` 路由处理器）调用，不是浏览器直接端点。
+        与 Yggdrasil 的 /authserver/authenticate 的区别：`MIRROR_CAPTCHA_SCOPES` 含 login 时
+        强制校验 captchaToken；启动器等协议客户端请继续走 /authserver/authenticate（永不强制验证码）。
+        与 /authserver/authenticate 共用按 IP 的 "auth" 限流桶。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: OK（形状同 /authserver/authenticate）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthenticateResponse"
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+        "503":
+          $ref: "./common.yaml#/components/responses/Error"
   /account/verify:
     post:
       operationId: verifyEmail
@@ -1620,6 +1648,18 @@ components:
           type: string
         inviteCode:
           type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        captchaToken:
+          type: string
+          description: login scope 启用时必填；其余场景忽略
     SkinLibItem:
       type: object
       required: [id, owner_user_id, player_name, texture_key, description, model, likes, status, created_at]
@@ -1751,7 +1791,7 @@ components:
             type: string
     RegisterRequirements:
       type: object
-      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, captchaCapUrl, minPasswordLength, emailDomains]
+      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, captchaCapUrl, captchaScopes, minPasswordLength, emailDomains]
       properties:
         registrationDisabled:
           type: boolean
@@ -1765,6 +1805,11 @@ components:
         captchaCapUrl:
           type: string
           description: cap driver 的 Standalone 实例公网地址（前端加载控件用）；其余 driver 为空串
+        captchaScopes:
+          type: array
+          description: 验证码保护范围（register | login）；前端据此决定注册/登录页是否渲染控件。验证码未生效时为空数组
+          items:
+            type: string
         minPasswordLength:
           type: integer
           description: 密码最小长度（与后端 account.MinPasswordLength 同源）

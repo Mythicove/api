@@ -6,7 +6,7 @@ The OpenAPI contract repository for the Mythicove ecosystem. It is the single so
 
 ## Conventions
 
-- One spec file per product: specs/mirror.openapi.yaml and specs/hoard.openapi.yaml. Future products (isles, atlas, compass) follow the same pattern.
+- One spec file per product: specs/mirror.openapi.yaml and specs/hoard.openapi.yaml. The mirror OIDC provider surface (consumed by web BFF and hoard RP) is modeled separately in specs/oidc.openapi.yaml. Future products (isles, atlas, compass) follow the same pattern.
 - Shared models (accounts, pagination, error responses) live in specs/common.yaml and are reused through $ref.
 - The specs start at OpenAPI 3.1.
 - Changing a spec changes the contract. CI generates the TS client from this repository, so generated artifacts are never hand-edited; the Go side is guarded by drift tests.

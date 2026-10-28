@@ -1,0 +1,438 @@
+# 本契约覆盖 mythic-mirror 的 OIDC IdP 面（/oauth2/*、/.well-known/*）：
+# 消费方是 web BFF（登录/同意 UI 走 JSON API）与 hoard RP（标准 OAuth2/OIDC 流程）。
+# 路由以 mythic-mirror/internal/oidc/handler.go RegisterRoutes 为准；
+# 客户端管理端点（/api/admin/oauth-clients）属 mirror 管理面，见 mirror.openapi.yaml。
+openapi: 3.1.0
+info:
+  title: Mythic Mirror OIDC Provider API
+  version: 0.1.0
+  description: |
+    Mirror 内嵌 OIDC Provider（fosite）的对外契约：授权码流程 + refresh_token + client_credentials，
+    登录/同意 UI 由前端（webURL）承载，后端只暴露重定向与 JSON API。
+    login/consent challenge 是 HMAC 签名的无状态 ticket（有效期 10 分钟）。
+servers:
+  - url: /
+paths:
+  /.well-known/openid-configuration:
+    get:
+      operationId: oidcDiscovery
+      summary: OIDC 发现文档
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+                  authorization_endpoint:
+                    type: string
+                  token_endpoint:
+                    type: string
+                  userinfo_endpoint:
+                    type: string
+                  jwks_uri:
+                    type: string
+                  revocation_endpoint:
+                    type: string
+                  response_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  subject_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  id_token_signing_alg_values_supported:
+                    type: array
+                    items:
+                      type: string
+                  scopes_supported:
+                    type: array
+                    items:
+                      type: string
+                  token_endpoint_auth_methods_supported:
+                    type: array
+                    items:
+                      type: string
+                  grant_types_supported:
+                    type: array
+                    items:
+                      type: string
+                  code_challenge_methods_supported:
+                    type: array
+                    items:
+                      type: string
+  /.well-known/jwks.json:
+    get:
+      operationId: oidcJwks
+      summary: JWKS 公钥集
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        kty:
+                          type: string
+                        use:
+                          type: string
+                        alg:
+                          type: string
+                        kid:
+                          type: string
+                        n:
+                          type: string
+                        e:
+                          type: string
+  /oauth2/auth:
+    get:
+      operationId: oidcAuthorize
+      summary: 授权端点（GET）
+      description: |
+        标准 OAuth2 授权请求（response_type=code，支持 PKCE S256）。
+        未登录 → 302 到 `{webURL}/oauth/login?challenge=...`；
+        已登录未同意（非第一方客户端）→ 302 到 `{webURL}/oauth/consent?challenge=...`；
+        持有效 consent ticket 或第一方客户端 → 302 回 redirect_uri 带 code。
+        全程不渲染 HTML；错误按 fosite 规范回 redirect_uri 或返回 JSON。
+      parameters:
+        - name: client_id
+          in: query
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+        - name: response_type
+          in: query
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          schema:
+            type: string
+        - name: code_challenge_method
+          in: query
+          schema:
+            type: string
+        - name: login_ticket
+          in: query
+          description: 登录完成后的流程 ticket（由 /oauth2/login/accept 签发）
+          schema:
+            type: string
+        - name: consent_ticket
+          in: query
+          description: 同意完成后的流程 ticket（由 /oauth2/consent/accept 签发）
+          schema:
+            type: string
+        - name: deny_ticket
+          in: query
+          description: 拒绝同意的流程 ticket（由 /oauth2/consent/reject 签发）
+          schema:
+            type: string
+      responses:
+        "302":
+          description: 重定向到前端登录/同意页，或回 redirect_uri（code / error）
+        "500":
+          $ref: "./common.yaml#/components/responses/Error"
+    post:
+      operationId: oidcAuthorizePost
+      summary: 授权端点（POST，表单编码，行为同 GET）
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                client_id:
+                  type: string
+                redirect_uri:
+                  type: string
+                response_type:
+                  type: string
+                scope:
+                  type: string
+                state:
+                  type: string
+                code_challenge:
+                  type: string
+                code_challenge_method:
+                  type: string
+      responses:
+        "302":
+          description: 重定向到前端登录/同意页，或回 redirect_uri（code / error）
+        "500":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/login/accept:
+    post:
+      operationId: oidcLoginAccept
+      summary: IdP 登录表单提交（校验主密码，签发 login ticket）
+      description: |
+        校验的是**网站主密码**（与 /account/login 同一条策略，含 binding_required /
+        password_login_disabled），并与 /authserver/authenticate 共用每 IP "auth" 限流桶。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge, email, password]
+              properties:
+                challenge:
+                  type: string
+                  description: 授权端点下发的 login ticket
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: 认证成功，前端应跳转 redirectTo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirectTo:
+                    type: string
+                    example: /oauth2/auth?...&login_ticket=...
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/consent:
+    get:
+      operationId: oidcConsentInfo
+      summary: 同意页信息（客户端与请求 scope）
+      parameters:
+        - name: challenge
+          in: query
+          required: true
+          schema:
+            type: string
+            description: 授权端点下发的 consent ticket
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  client_id:
+                    type: string
+                  client_name:
+                    type: string
+                  scopes:
+                    type: array
+                    items:
+                      type: string
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/consent/accept:
+    post:
+      operationId: oidcConsentAccept
+      summary: 用户同意授权（签发 consent ticket）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge]
+              properties:
+                challenge:
+                  type: string
+      responses:
+        "200":
+          description: 前端应跳转 redirectTo（回授权端点发 code）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirectTo:
+                    type: string
+                    example: /oauth2/auth?...&consent_ticket=...
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/consent/reject:
+    post:
+      operationId: oidcConsentReject
+      summary: 用户拒绝授权（签发 deny ticket）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge]
+              properties:
+                challenge:
+                  type: string
+      responses:
+        "200":
+          description: 前端应跳转 redirectTo（回授权端点发 access_denied）
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  redirectTo:
+                    type: string
+                    example: /oauth2/auth?...&deny_ticket=...
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/token:
+    post:
+      operationId: oidcToken
+      summary: 令牌端点（OAuth2 标准）
+      description: |
+        grant_type 支持 authorization_code（含 PKCE code_verifier）、refresh_token、
+        client_credentials。客户端认证支持 client_secret_basic / client_secret_post / none（公开客户端）。
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token, client_credentials]
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                code_verifier:
+                  type: string
+                refresh_token:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: bearer
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+                  id_token:
+                    type: string
+                  scope:
+                    type: string
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/revoke:
+    post:
+      operationId: oidcRevoke
+      summary: 令牌撤销（RFC 7009）
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+                token_type_hint:
+                  type: string
+                  enum: [access_token, refresh_token]
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        "200":
+          description: 已撤销（含 token 不存在的幂等情形）
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+  /oauth2/userinfo:
+    get:
+      operationId: oidcUserinfoGet
+      summary: 用户信息端点（Bearer access_token）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserinfoClaims"
+        "401":
+          description: 缺少或无效令牌
+    post:
+      operationId: oidcUserinfoPost
+      summary: 用户信息端点（POST，行为同 GET）
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserinfoClaims"
+        "401":
+          description: 缺少或无效令牌
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    UserinfoClaims:
+      type: object
+      required: [sub]
+      properties:
+        sub:
+          type: string
+        preferred_username:
+          type: string
+        email:
+          type: string
+        nickname:
+          type: string
+        player:
+          type: string
+          description: 仅当账号恰好一个玩家时给出（多玩家不发，见 handler newSession）

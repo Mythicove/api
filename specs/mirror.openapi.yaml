@@ -7,7 +7,7 @@ info:
 
     本契约只描述当前后端真正实现的路由（受 mythic-mirror 仓库的 spec 漂移测试保护）。
     OIDC Provider 端点（/oauth2/*、/.well-known/*）遵循 OAuth2/OIDC 标准，
-    自描述见 /.well-known/openid-configuration，暂不在本契约中重复建模。
+    建模于 specs/oidc.openapi.yaml，不在本契约中重复。
 servers:
   - url: /
 paths:
@@ -513,6 +513,9 @@ paths:
           $ref: "./common.yaml#/components/responses/Error"
         "409":
           $ref: "./common.yaml#/components/responses/Error"
+        "503":
+          $ref: "./common.yaml#/components/responses/Error"
+          description: captcha driver misconfigured
   /account/login:
     post:
       operationId: accountLogin

@@ -6,7 +6,7 @@ Mythicove 生态的统一 OpenAPI 契约仓库，作为单一事实源：TypeScr
 
 ## 约定
 
-- 每个产品一个 spec 文件：specs/mirror.openapi.yaml、specs/hoard.openapi.yaml，后续的 isles、atlas、compass 同理。
+- 每个产品一个 spec 文件：specs/mirror.openapi.yaml、specs/hoard.openapi.yaml，后续的 isles、atlas、compass 同理。mirror 的 OIDC IdP 面（web BFF 与 hoard RP 消费）单独建模在 specs/oidc.openapi.yaml。
 - 公共模型（账号、分页、错误响应）抽到 specs/common.yaml，用 $ref 复用。
 - 以 OpenAPI 3.1 起步。
 - 改 spec 就是改契约：TS client 由 CI 从本仓库生成，不要手写生成物；Go 侧由漂移测试把关。

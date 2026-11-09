@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: Mythic Isles API
+  version: 0.1.0
+  description: Optional server directory, game probes and integration management. Admin credentials never enter public responses.
+servers:
+  - url: http://localhost:8095
+paths:
+  /api/isles/servers:
+    get:
+      operationId: listServers
+      responses:
+        '200':
+          description: Published servers only; panel bindings and packwiz source are omitted.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Server' }
+  /api/isles/servers/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getServer
+      responses:
+        '200':
+          description: Published server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+        '404': { description: Server unavailable }
+  /api/isles/servers/{id}/status:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getGameStatus
+      responses:
+        '200':
+          description: Game probe observation, cached for 20 seconds. Latency is from Isles.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameStatus' }
+        '404': { description: Server unavailable }
+  /api/isles/packs/{version}:
+    get:
+      operationId: downloadPack
+      parameters:
+        - in: path
+          name: version
+          required: true
+          schema: { type: string, pattern: '^[a-f0-9]{64}$' }
+      responses:
+        '200':
+          description: Hash-addressed published pack
+          content:
+            application/x-modrinth-modpack+zip:
+              schema: { type: string, format: binary }
+        '404': { description: Not attached to a published server }
+  /api/isles/admin/config:
+    get:
+      operationId: getIslesConfig
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Configuration without connection tokens
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Config' }
+        '401': { description: Service token required }
+  /api/isles/admin/servers/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    put:
+      operationId: saveServer
+      security: [{ serviceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Server' }
+      responses:
+        '200':
+          description: Saved server; packVersion is preserved by the server
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Server' }
+        '400': { description: Invalid configuration }
+        '401': { description: Service token required }
+    delete:
+      operationId: deleteServer
+      security: [{ serviceToken: [] }]
+      responses:
+        '204': { description: Removed }
+        '401': { description: Service token required }
+  /api/isles/admin/connections/{id}:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    put:
+      operationId: saveConnection
+      security: [{ serviceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/Connection' }
+                - type: object
+                  properties:
+                    token:
+                      type: string
+                      writeOnly: true
+                      description: Omit to preserve existing secret; an empty value clears it.
+      responses:
+        '200':
+          description: Saved connection without token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Connection' }
+        '400': { description: Invalid connection }
+        '401': { description: Service token required }
+    delete:
+      operationId: deleteConnection
+      security: [{ serviceToken: [] }]
+      responses:
+        '204': { description: Removed }
+        '409': { description: Connection is bound to a server }
+        '401': { description: Service token required }
+  /api/isles/admin/connections/{id}/instances:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listPanelInstances
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Panel instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Instance' }
+        '502': { description: Panel unavailable or rejected request }
+        '401': { description: Service token required }
+  /api/isles/admin/connections/{id}/metrics:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getExporterMetrics
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Selected server-level Prometheus metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checkedAt, metrics]
+                properties:
+                  checkedAt: { type: string, format: date-time }
+                  metrics:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, labels, value]
+                      properties:
+                        name: { type: string }
+                        labels: { type: object, additionalProperties: { type: string } }
+                        value: { type: number }
+        '502': { description: Exporter unavailable or invalid exposition }
+        '401': { description: Service token required }
+  /api/isles/admin/servers/{id}/runtime:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getPanelRuntime
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Process status, separate from game reachability
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Runtime' }
+        '409': { description: No bound panel instance }
+        '502': { description: Panel unavailable }
+        '401': { description: Service token required }
+  /api/isles/admin/servers/{id}/actions/{action}:
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - in: path
+        name: action
+        required: true
+        schema: { type: string, enum: [start, stop, restart, command] }
+    post:
+      operationId: controlInstance
+      security: [{ serviceToken: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                command: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '202': { description: Accepted by the panel; poll runtime to confirm }
+        '400': { description: Invalid action or command }
+        '409': { description: No bound panel instance }
+        '502': { description: Panel rejected request }
+        '401': { description: Service token required }
+  /api/isles/admin/servers/{id}/logs:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getRecentLogs
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Last 64KB of MCSManager log
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text]
+                properties:
+                  text: { type: string }
+        '501': { description: Panel requires its WebSocket console }
+        '502': { description: Panel unavailable }
+        '401': { description: Service token required }
+  /api/isles/admin/servers/{id}/publish-pack:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: publishPackwiz
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Verified immutable mrpack publication
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, path]
+                properties:
+                  version: { type: string }
+                  path: { type: string }
+        '400': { description: No configured source }
+        '409': { description: Source changed during publication }
+        '502': { description: Source unavailable, unsupported or failed hash validation }
+        '401': { description: Service token required }
+components:
+  securitySchemes:
+    serviceToken: { type: http, scheme: bearer }
+  parameters:
+    id:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,63}$' }
+  schemas:
+    Link:
+      type: object
+      required: [kind, url, label]
+      properties:
+        kind: { type: string }
+        url: { type: string, format: uri }
+        label: { type: string }
+    Server:
+      type: object
+      required: [id, name, description, address, edition, published, links]
+      properties:
+        id: { type: string }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, maxLength: 4000 }
+        address: { type: string, description: 'host:port, IPv6 enclosed in brackets' }
+        edition: { type: string, enum: [java, bedrock] }
+        coverUrl: { type: string, format: uri }
+        links: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/Link' } }
+        published: { type: boolean }
+        connectionId: { type: string, description: Admin only }
+        daemonId: { type: string, description: Admin only }
+        instanceId: { type: string, description: Admin only }
+        packwizUrl: { type: string, format: uri, description: Admin only }
+        packVersion: { type: string, readOnly: true }
+    Connection:
+      type: object
+      required: [id, name, kind, url, configured]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        kind: { type: string, enum: [mcsm, pterodactyl, prometheus] }
+        url: { type: string, format: uri }
+        configured: { type: boolean, readOnly: true }
+    Config:
+      type: object
+      required: [servers, connections]
+      properties:
+        servers: { type: array, items: { $ref: '#/components/schemas/Server' } }
+        connections: { type: array, items: { $ref: '#/components/schemas/Connection' } }
+    GameStatus:
+      type: object
+      required: [reachable, checkedAt, latencyMs]
+      properties:
+        reachable: { type: boolean }
+        checkedAt: { type: string, format: date-time }
+        latencyMs: { type: integer }
+        players: { type: integer }
+        maxPlayers: { type: integer }
+        version: { type: string }
+        motd: { type: string }
+        error: { type: string }
+    Instance:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        daemonId: { type: string }
+    Runtime:
+      type: object
+      required: [state, checkedAt]
+      properties:
+        state: { type: string }
+        checkedAt: { type: string, format: date-time }
+        cpuPercent: { type: number }
+        memoryBytes: { type: integer }

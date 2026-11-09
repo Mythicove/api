@@ -238,16 +238,269 @@ paths:
         '409': { description: Source changed during publication }
         '502': { description: Source unavailable, unsupported or failed hash validation }
         '401': { description: Service token required }
+  /api/isles/admin/servers/{id}/bridge-token:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: rotateBridgeToken
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Server-specific token shown only on creation; old token is immediately revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token]
+                properties:
+                  token: { type: string }
+        '401': { description: Administrator required }
+  /api/isles/admin/servers/{id}/bridge:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getBridgeObservation
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Latest observation; fresh means received within 90 seconds.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [snapshot, fresh]
+                properties:
+                  fresh: { type: boolean }
+                  snapshot: { $ref: '#/components/schemas/BridgeSnapshot' }
+        '409': { description: Bridge has not connected }
+  /api/isles/admin/servers/{id}/identities:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listVerifiedGameIdentities
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Verified website-player to game identities for this server
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [player, identity]
+                  properties:
+                    player: { type: string }
+                    identity: { $ref: '#/components/schemas/GameIdentity' }
+  /api/isles/admin/servers/{id}/tasks:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listBridgeTasks
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Durable desired-state task results
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BridgeTask' }
+    post:
+      operationId: setGameMembership
+      security: [{ serviceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [player, kind, grant]
+              properties:
+                player: { type: string }
+                kind: { type: string, enum: [whitelist, member] }
+                group: { type: string, description: Existing group reported by the Bridge }
+                grant: { type: boolean }
+      responses:
+        '200':
+          description: Queued, not yet applied
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeTask' }
+        '409': { description: Verified identity, current Bridge observation or provider is missing }
+  /api/isles/players/{player}/pair:
+    parameters:
+      - { $ref: '#/components/parameters/player' }
+    post:
+      operationId: createGamePairing
+      description: Web BFF verifies website session and ownership; direct Isles calls require service token and X-Isles-Player.
+      security: [{ serviceToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [server]
+              properties:
+                server: { type: string }
+      responses:
+        '200':
+          description: One-time game linking code, valid for 10 minutes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, command, expiresAt]
+                properties:
+                  code: { type: string }
+                  command: { type: string }
+                  expiresAt: { type: string, format: date-time }
+        '401': { description: Website-player ownership required }
+  /api/isles/players/{player}/links:
+    parameters:
+      - { $ref: '#/components/parameters/player' }
+    get:
+      operationId: listOwnGameLinks
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Verified game identities and own online-player data only
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [server, identity, fresh]
+                  properties:
+                    server: { type: string }
+                    identity: { $ref: '#/components/schemas/GameIdentity' }
+                    fresh: { type: boolean }
+                    player: { $ref: '#/components/schemas/PlayerSnapshot' }
+  /api/isles/bridge/{id}/heartbeat:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: observeGameBridge
+      security: [{ bridgeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BridgeSnapshot' }
+      responses:
+        '204': { description: Observation received }
+        '401': { description: Server-specific Bridge token required }
+  /api/isles/bridge/{id}/link:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: verifyGamePairing
+      security: [{ bridgeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, uuid, name, platform]
+              properties:
+                code: { type: string }
+                uuid: { type: string }
+                name: { type: string }
+                platform: { type: string }
+      responses:
+        '204': { description: Verified and consumed }
+        '403': { description: Code expired, consumed or bound to another server }
+        '409': { description: Game identity belongs to another website player }
+  /api/isles/bridge/{id}/tasks:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: getPendingBridgeTasks
+      security: [{ bridgeToken: [] }]
+      responses:
+        '200':
+          description: Up to 10 pending desired-state tasks, safe to replay before acknowledgement
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BridgeTask' }
+  /api/isles/bridge/{id}/tasks/{task}:
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - in: path
+        name: task
+        required: true
+        schema: { type: string }
+    post:
+      operationId: acknowledgeBridgeTask
+      security: [{ bridgeToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [success]
+              properties:
+                success: { type: boolean }
+                error: { type: string, maxLength: 500 }
+      responses:
+        '204': { description: Result persisted; repeated acknowledgement is idempotent }
 components:
   securitySchemes:
     serviceToken: { type: http, scheme: bearer }
+    bridgeToken: { type: http, scheme: bearer, description: Server-specific token, never a service admin token }
   parameters:
+    player:
+      in: path
+      name: player
+      required: true
+      schema: { type: string }
     id:
       in: path
       name: id
       required: true
       schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,63}$' }
   schemas:
+    GameIdentity:
+      type: object
+      required: [uuid, name, platform, linkedAt]
+      properties:
+        uuid: { type: string }
+        name: { type: string }
+        platform: { type: string }
+        linkedAt: { type: string, format: date-time }
+    PlayerSnapshot:
+      type: object
+      required: [uuid, name]
+      properties:
+        uuid: { type: string }
+        name: { type: string }
+        group: { type: string }
+        groups: { type: array, items: { type: string } }
+        values: { type: object, additionalProperties: { type: string } }
+    BridgeSnapshot:
+      type: object
+      required: [platform, minecraft, plugins, groups, players, receivedAt]
+      properties:
+        platform: { type: string }
+        minecraft: { type: string }
+        plugins: { type: object, additionalProperties: { type: string } }
+        groups: { type: array, maxItems: 500, items: { type: string } }
+        players: { type: array, maxItems: 2000, items: { $ref: '#/components/schemas/PlayerSnapshot' } }
+        tps: { type: number }
+        mspt: { type: number }
+        cpu: { type: number, description: Fraction of system CPU usage }
+        receivedAt: { type: string, format: date-time, readOnly: true }
+    BridgeTask:
+      type: object
+      required: [id, kind, uuid, grant, status, createdAt]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [whitelist, member] }
+        uuid: { type: string }
+        group: { type: string }
+        grant: { type: boolean }
+        status: { type: string, enum: [pending, applied, failed] }
+        error: { type: string }
+        createdAt: { type: string, format: date-time }
     Link:
       type: object
       required: [kind, url, label]

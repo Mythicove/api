@@ -6,6 +6,74 @@ info:
 servers:
   - url: http://localhost:8095
 paths:
+  /api/isles/catalog/modrinth/search:
+    get:
+      operationId: searchModrinthCatalog
+      parameters:
+        - { in: query, name: q, required: true, schema: { type: string, maxLength: 120 } }
+        - { in: query, name: loader, schema: { type: string, maxLength: 64 } }
+        - { in: query, name: game_version, schema: { type: string, maxLength: 32 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Fixed-origin Modrinth project metadata; files are not mirrored.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CatalogProject' } }
+        '400': { description: Invalid query }
+        '429': { description: Catalog upstream budget exhausted }
+        '502': { description: Upstream unavailable or invalid }
+  /api/isles/catalog/hangar/search:
+    get:
+      operationId: searchHangarCatalog
+      parameters:
+        - { in: query, name: q, required: true, schema: { type: string, maxLength: 120 } }
+        - { in: query, name: platform, schema: { type: string, maxLength: 32 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Fixed-origin Hangar project metadata; files are not mirrored.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CatalogProject' } }
+        '400': { description: Invalid query }
+        '429': { description: Catalog upstream budget exhausted }
+        '502': { description: Upstream unavailable or invalid }
+  /api/isles/catalog/modrinth/versions/{project}:
+    get:
+      operationId: listModrinthVersions
+      parameters:
+        - { in: path, name: project, required: true, schema: { type: string } }
+        - { in: query, name: loader, schema: { type: string, maxLength: 64 } }
+        - { in: query, name: game_version, schema: { type: string, maxLength: 32 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Versions with upstream-declared file hashes, download URLs and compatibility.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CatalogVersion' } }
+        '400': { description: Invalid filters }
+        '429': { description: Catalog upstream budget exhausted }
+        '502': { description: Upstream unavailable or invalid }
+  /api/isles/catalog/hangar/versions/{owner}/{project}:
+    get:
+      operationId: listHangarVersions
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: project, required: true, schema: { type: string } }
+        - { in: query, name: platform, schema: { type: string, maxLength: 32 } }
+        - { in: query, name: game_version, schema: { type: string, maxLength: 32 } }
+        - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Versions and downloads on selected platforms; external-only artifacts have no direct download.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CatalogVersion' } }
+        '400': { description: Invalid filters }
+        '429': { description: Catalog upstream budget exhausted }
+        '502': { description: Upstream unavailable or invalid }
   /api/isles/servers:
     get:
       operationId: listServers
@@ -459,6 +527,42 @@ components:
       required: true
       schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,63}$' }
   schemas:
+    CatalogFile:
+      type: object
+      required: [name, url, hashes, size]
+      properties:
+        name: { type: string }
+        url: { type: string, format: uri }
+        hashes: { type: object, additionalProperties: { type: string } }
+        size: { type: integer, format: int64 }
+        platform: { type: string }
+    CatalogVersion:
+      type: object
+      required: [id, name, number, channel, gameVersions, loaders, files]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        number: { type: string }
+        channel: { type: string }
+        gameVersions: { type: array, items: { type: string } }
+        loaders: { type: array, items: { type: string } }
+        files: { type: array, items: { $ref: '#/components/schemas/CatalogFile' } }
+    CatalogProject:
+      type: object
+      required: [id, slug, title, source, url]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: string }
+        projectType: { type: string }
+        iconUrl: { type: string, format: uri }
+        source: { type: string, enum: [modrinth, hangar] }
+        url: { type: string, format: uri }
+        downloads: { type: integer, format: int64 }
+        categories: { type: array, items: { type: string } }
+        loaders: { type: array, items: { type: string } }
+        gameVersions: { type: array, items: { type: string } }
     GameIdentity:
       type: object
       required: [uuid, name, platform, linkedAt]

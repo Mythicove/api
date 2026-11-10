@@ -580,6 +580,19 @@ components:
         group: { type: string }
         groups: { type: array, items: { type: string } }
         values: { type: object, additionalProperties: { type: string } }
+        clientVersion: { type: string, description: Protocol version observed by ViaVersion for this online player }
+        regions: { type: array, maxItems: 32, items: { $ref: '#/components/schemas/GameRegion' } }
+        regionsTruncated: { type: boolean, description: Additional matching regions were omitted }
+    GameRegion:
+      type: object
+      required: [id, world, role, centerX, centerY, centerZ]
+      properties:
+        id: { type: string }
+        world: { type: string }
+        role: { type: string, enum: [owner, member] }
+        centerX: { type: integer }
+        centerY: { type: integer }
+        centerZ: { type: integer }
     BridgeSnapshot:
       type: object
       required: [platform, minecraft, plugins, groups, players, receivedAt]
@@ -593,6 +606,7 @@ components:
         mspt: { type: number }
         cpu: { type: number, description: Fraction of system CPU usage }
         receivedAt: { type: string, format: date-time, readOnly: true }
+        protocolVersions: { type: array, maxItems: 256, items: { type: string }, description: ViaVersion-supported protocols after configured blocks; does not guarantee proxy/modpack compatibility }
     BridgeTask:
       type: object
       required: [id, kind, uuid, grant, status, createdAt]

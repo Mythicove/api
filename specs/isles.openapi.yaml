@@ -450,7 +450,7 @@ paths:
       security: [{ serviceToken: [] }]
       responses:
         '200':
-          description: Verified game identities and own online-player data only
+          description: Verified game identities with own online-player observations and stored Plan activity only
           content:
             application/json:
               schema:
@@ -463,6 +463,7 @@ paths:
                     identity: { $ref: '#/components/schemas/GameIdentity' }
                     fresh: { type: boolean }
                     player: { $ref: '#/components/schemas/PlayerSnapshot' }
+                    activity: { $ref: '#/components/schemas/PlanActivity' }
   /api/isles/bridge/{id}/heartbeat:
     parameters: [{ $ref: '#/components/parameters/id' }]
     post:
@@ -497,6 +498,20 @@ paths:
         '204': { description: Verified and consumed }
         '403': { description: Code expired, consumed or bound to another server }
         '409': { description: Game identity belongs to another website player }
+  /api/isles/bridge/{id}/identities:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    get:
+      operationId: listBridgeVerifiedUUIDs
+      security: [{ bridgeToken: [] }]
+      description: UUID allowlist for private offline statistics on this server; contains no website identities. Maximum 2000 verified identities; exceeding capacity fails explicitly.
+      responses:
+        '200':
+          description: Verified game UUIDs belonging to this server
+          content:
+            application/json:
+              schema: { type: array, maxItems: 2000, items: { type: string } }
+        '401': { description: Server-specific token required }
+        '409': { description: Verified identity capacity exceeded }
   /api/isles/bridge/{id}/tasks:
     parameters: [{ $ref: '#/components/parameters/id' }]
     get:
@@ -654,6 +669,31 @@ components:
         receivedAt: { type: string, format: date-time, readOnly: true }
         protocolVersions: { type: array, maxItems: 256, items: { type: string }, description: ViaVersion-supported protocols after configured blocks; does not guarantee proxy/modpack compatibility }
         chunky: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ChunkyWorld' }, description: Administrator-only loaded worlds and Chunky task state; absent if unavailable }
+        plan: { $ref: '#/components/schemas/PlanSnapshot' }
+    PlanActivity:
+      type: object
+      description: Stored Plan sessions for one verified UUID on the current game server; available while offline. Does not include an unsaved current session.
+      required: [uuid, sessions, playtimeMs, afkMs, firstSeen, lastSeen, observedAt]
+      properties:
+        uuid: { type: string }
+        sessions: { type: integer, format: int64, minimum: 1 }
+        playtimeMs: { type: integer, format: int64, minimum: 0, description: Stored session duration including AFK }
+        afkMs: { type: integer, format: int64, minimum: 0 }
+        firstSeen: { type: string, format: date-time, description: Earliest stored session start }
+        lastSeen: { type: string, format: date-time, description: Latest stored session end; not live presence }
+        observedAt: { type: string, format: date-time }
+    PlanSnapshot:
+      type: object
+      description: Administrator-only Plan aggregate scoped by the provider's current server UUID. Individual rows include verified UUIDs only; absent when provider/query is unavailable.
+      required: [serverUUID, recordedPlayers, sessions, playtimeMs, afkMs, observedAt, players]
+      properties:
+        serverUUID: { type: string }
+        recordedPlayers: { type: integer, format: int64, minimum: 0, description: Distinct players with stored sessions on this server }
+        sessions: { type: integer, format: int64, minimum: 0 }
+        playtimeMs: { type: integer, format: int64, minimum: 0 }
+        afkMs: { type: integer, format: int64, minimum: 0 }
+        observedAt: { type: string, format: date-time }
+        players: { type: array, maxItems: 2000, items: { $ref: '#/components/schemas/PlanActivity' } }
     ChunkyWorld:
       type: object
       required: [world, state]

@@ -643,6 +643,13 @@ components:
         instanceId: { type: string, description: Admin only }
         packwizUrl: { type: string, format: uri, description: Admin only }
         packVersion: { type: string, readOnly: true }
+        map: { $ref: '#/components/schemas/WorldMap' }
+    WorldMap:
+      type: object
+      required: [kind, url]
+      properties:
+        kind: { type: string, enum: [bluemap, squaremap, dynmap] }
+        url: { type: string, format: uri, description: Browser-facing map URL; may retain a saved camera-location fragment }
     Connection:
       type: object
       required: [id, name, kind, url, configured]

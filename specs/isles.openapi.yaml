@@ -392,6 +392,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BridgeTask' }
         '409': { description: Verified identity, current Bridge observation or provider is missing }
+  /api/isles/admin/servers/{id}/chunky:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: controlChunkyGeneration
+      security: [{ serviceToken: [] }]
+      description: Queue one generation operation for a reported loaded world. Start accepts square/circle and a radius in blocks; it never overwrites paused work. Applied means the plugin accepted the operation, not that generation completed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChunkyOperation' }
+      responses:
+        '200':
+          description: Operation queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeTask' }
+        '400': { description: Invalid selection or unreported world }
+        '401': { description: Administrator required }
+        '409': { description: 'Bridge stale, provider unavailable, incompatible state or operation already pending' }
+        '429': { description: Task capacity reached }
   /api/isles/players/{player}/pair:
     parameters:
       - { $ref: '#/components/parameters/player' }
@@ -483,12 +504,27 @@ paths:
       security: [{ bridgeToken: [] }]
       responses:
         '200':
-          description: Up to 10 pending desired-state tasks, safe to replay before acknowledgement
+          description: Up to 10 pending tasks. Membership sets desired state; Chunky operations MUST be claimed before execution and must never be replayed after dispatch.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/BridgeTask' }
+  /api/isles/bridge/{id}/tasks/{task}/claim:
+    parameters:
+      - { $ref: '#/components/parameters/id' }
+      - in: path
+        name: task
+        required: true
+        schema: { type: string }
+    post:
+      operationId: claimBridgeOperation
+      security: [{ bridgeToken: [] }]
+      description: Persist at-most-once dispatch of a Chunky operation before invoking the provider. A lost claim or result response leaves dispatched with an uncertain outcome; no automatic replay occurs, including after restart.
+      responses:
+        '204': { description: Dispatch persisted; this caller may execute once }
+        '409': { description: Already dispatched or not a claimable operation; do not execute }
+        '401': { description: Server-specific Bridge token required }
   /api/isles/bridge/{id}/tasks/{task}:
     parameters:
       - { $ref: '#/components/parameters/id' }
@@ -511,6 +547,7 @@ paths:
                 error: { type: string, maxLength: 500 }
       responses:
         '204': { description: Result persisted; repeated acknowledgement is idempotent }
+        '409': { description: Chunky operation must be claimed first }
 components:
   securitySchemes:
     serviceToken: { type: http, scheme: bearer }
@@ -616,16 +653,52 @@ components:
         cpu: { type: number, description: Fraction of system CPU usage }
         receivedAt: { type: string, format: date-time, readOnly: true }
         protocolVersions: { type: array, maxItems: 256, items: { type: string }, description: ViaVersion-supported protocols after configured blocks; does not guarantee proxy/modpack compatibility }
+        chunky: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ChunkyWorld' }, description: Administrator-only loaded worlds and Chunky task state; absent if unavailable }
+    ChunkyWorld:
+      type: object
+      required: [world, state]
+      properties:
+        world: { type: string }
+        state: { type: string, enum: [idle, running, paused, completed, cancelled, stopped], description: Stopped means the saved terminal checkpoint cannot establish completion versus cancellation after a restart }
+        selection:
+          type: object
+          required: [shape, centerX, centerZ, radiusX, radiusZ]
+          properties:
+            shape: { type: string }
+            centerX: { type: number }
+            centerZ: { type: number }
+            radiusX: { type: number }
+            radiusZ: { type: number }
+        progress:
+          type: object
+          required: [chunks, total, percent]
+          properties:
+            chunks: { type: integer, format: int64, minimum: 0 }
+            total: { type: integer, format: int64, minimum: 0 }
+            percent: { type: number, minimum: 0, maximum: 100 }
+            rate: { type: number, minimum: 0, description: Plugin estimate in chunks per second; only available while running }
+            etaSeconds: { type: integer, format: int64, minimum: 0, description: Plugin ETA while running; never completion elapsed time }
+    ChunkyOperation:
+      type: object
+      required: [world, action]
+      properties:
+        world: { type: string, maxLength: 256, description: Loaded world reported by the Bridge }
+        action: { type: string, enum: [start, pause, continue, cancel] }
+        shape: { type: string, enum: [square, circle], description: Required for start }
+        centerX: { type: number, description: Defaults to zero }
+        centerZ: { type: number, description: Defaults to zero }
+        radius: { type: number, minimum: 1, maximum: 100000, description: 'Required for start; blocks, also bounded by the server Chunky radius limit' }
     BridgeTask:
       type: object
       required: [id, kind, uuid, grant, status, createdAt]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [whitelist, member] }
+        kind: { type: string, enum: [whitelist, member, chunky] }
         uuid: { type: string }
         group: { type: string }
         grant: { type: boolean }
-        status: { type: string, enum: [pending, applied, failed] }
+        status: { type: string, enum: [pending, dispatched, applied, failed], description: Dispatched means claimed with no result yet; an interrupted operation is never automatically replayed }
+        chunky: { $ref: '#/components/schemas/ChunkyOperation' }
         error: { type: string }
         createdAt: { type: string, format: date-time }
     Link:

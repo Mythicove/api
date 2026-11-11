@@ -20,15 +20,15 @@ paths:
     get:
       operationId: scrapeIslesMetrics
       summary: Private Prometheus Bridge snapshot gauges
-      description: Direct private Isles endpoint using the existing service token. Exposes configured server IDs, Bridge freshness/observation time and fresh TPS/MSPT/system CPU/GC only. Performance series are omitted after 90 seconds or when unknown. GC gauges retain provider-reset semantics. No player data or upstream calls on scrape. Use Prometheus for history; Web BFF does not expose this route.
-      security: [{ serviceToken: [] }]
+      description: Direct private Isles endpoint. When ISLES_METRICS_TOKEN is configured only that read-only token is accepted; otherwise the existing service token is required. Exposes configured server IDs, Bridge freshness/observation time and fresh TPS/MSPT/system CPU/GC only. Performance series are omitted after 90 seconds or when unknown. GC gauges retain provider-reset semantics. No player data or upstream calls on scrape. Use Prometheus for history; Web BFF does not expose this route.
+      security: [{ metricsToken: [] }, { serviceToken: [] }]
       responses:
         '200':
           description: Prometheus text exposition 0.0.4, all series are gauges
           content:
             text/plain:
               schema: { type: string }
-        '401': { description: Service token required; a per-server Bridge token is insufficient }
+        '401': { description: 'Configured metrics token required, or service token when no metrics token is configured; a per-server Bridge token is insufficient' }
   /api/isles/catalog/modrinth/hash/{hash}:
     get:
       operationId: identifyModrinthFile
@@ -610,6 +610,7 @@ paths:
 components:
   securitySchemes:
     serviceToken: { type: http, scheme: bearer }
+    metricsToken: { type: http, scheme: bearer, description: Optional distinct scrape-only token; does not authorize administration }
     bridgeToken: { type: http, scheme: bearer, description: Server-specific token, never a service admin token }
   parameters:
     player:

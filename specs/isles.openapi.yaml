@@ -6,6 +6,26 @@ info:
 servers:
   - url: http://localhost:8095
 paths:
+  /api/isles/catalog/modrinth/hash/{hash}:
+    get:
+      operationId: identifyModrinthFile
+      summary: Identify a local file by its browser-computed SHA-512 digest
+      description: Queries the fixed Modrinth file index; no file content or name is uploaded. Only returned files with the exact publisher digest are exposed. Identification does not attest safety or installation compatibility. Uses the shared catalog cache and request budget.
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-fA-F0-9]{128}$' }
+      responses:
+        '200':
+          description: Exact publisher-digest match; version.files contains only matching files
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogMatch' }
+        '400': { description: Invalid digest or query parameters }
+        '404': { description: File hash not indexed by Modrinth }
+        '429': { description: Shared catalog request budget exhausted }
+        '502': { description: Source unavailable or returned no consistent file identity }
   /api/isles/catalog/modrinth/search:
     get:
       operationId: searchModrinthCatalog
@@ -580,6 +600,12 @@ components:
       required: true
       schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,63}$' }
   schemas:
+    CatalogMatch:
+      type: object
+      required: [projectId, version]
+      properties:
+        projectId: { type: string, description: Modrinth project ID reported for this file }
+        version: { $ref: '#/components/schemas/CatalogVersion' }
     CatalogFile:
       type: object
       required: [name, url, hashes, size]

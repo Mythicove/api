@@ -707,6 +707,12 @@ components:
         centerX: { type: integer }
         centerY: { type: integer }
         centerZ: { type: integer }
+    GarbageCollectorStats:
+      type: object
+      description: Administrator-only spark GC counters since the provider's normal-operation baseline (startup activity excluded). Each unknown counter is omitted independently; zero is retained as reported. Counters reset with the provider/server, not a rolling interval or pause histogram.
+      properties:
+        collections: { type: integer, format: int64, minimum: 0 }
+        timeMs: { type: integer, format: int64, minimum: 0, description: Provider-reported accumulated collection time in milliseconds }
     BridgeSnapshot:
       type: object
       required: [platform, minecraft, plugins, groups, players, receivedAt]
@@ -719,6 +725,11 @@ components:
         tps: { type: number }
         mspt: { type: number }
         cpu: { type: number, description: Fraction of system CPU usage }
+        garbageCollectors:
+          type: object
+          maxProperties: 32
+          description: GC statistics keyed by provider-reported collector name; absent when unavailable. Never exposed in the public directory or player profile.
+          additionalProperties: { $ref: '#/components/schemas/GarbageCollectorStats' }
         receivedAt: { type: string, format: date-time, readOnly: true }
         protocolVersions: { type: array, maxItems: 256, items: { type: string }, description: ViaVersion-supported protocols after configured blocks; does not guarantee proxy/modpack compatibility }
         chunky: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ChunkyWorld' }, description: Administrator-only loaded worlds and Chunky task state; absent if unavailable }

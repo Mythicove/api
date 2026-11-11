@@ -6,6 +6,29 @@ info:
 servers:
   - url: http://localhost:8095
 paths:
+  /healthz:
+    get:
+      operationId: getIslesHealth
+      summary: Process health; does not establish game-server or Bridge health
+      responses:
+        '200':
+          description: Isles process is serving requests
+          content:
+            text/plain:
+              schema: { type: string, example: ok }
+  /metrics:
+    get:
+      operationId: scrapeIslesMetrics
+      summary: Private Prometheus Bridge snapshot gauges
+      description: Direct private Isles endpoint using the existing service token. Exposes configured server IDs, Bridge freshness/observation time and fresh TPS/MSPT/system CPU/GC only. Performance series are omitted after 90 seconds or when unknown. GC gauges retain provider-reset semantics. No player data or upstream calls on scrape. Use Prometheus for history; Web BFF does not expose this route.
+      security: [{ serviceToken: [] }]
+      responses:
+        '200':
+          description: Prometheus text exposition 0.0.4, all series are gauges
+          content:
+            text/plain:
+              schema: { type: string }
+        '401': { description: Service token required; a per-server Bridge token is insufficient }
   /api/isles/catalog/modrinth/hash/{hash}:
     get:
       operationId: identifyModrinthFile

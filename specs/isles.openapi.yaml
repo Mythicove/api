@@ -990,6 +990,7 @@ components:
         version: { type: string }
         motd: { type: string }
         error: { type: string }
+        protocolVersions: { type: array, maxItems: 256, items: { type: string }, description: Allowed protocol names from a Bridge heartbeat less than 90 seconds old. Omitted when unavailable or stale; does not establish modpack or authentication compatibility. }
     Instance:
       type: object
       required: [id, name]

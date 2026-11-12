@@ -456,6 +456,27 @@ paths:
         '401': { description: Administrator required }
         '409': { description: 'Bridge stale, provider unavailable, incompatible state or operation already pending' }
         '429': { description: Task capacity reached }
+  /api/isles/admin/servers/{id}/coreprotect:
+    parameters: [{ $ref: '#/components/parameters/id' }]
+    post:
+      operationId: queryCoreProtectHistory
+      security: [{ serviceToken: [] }]
+      description: Administrator-only exact-coordinate persisted history via CoreProtect API v12. Queues an asynchronous read; retrieve result from admin tasks. Each page is an independent read, newest first; new events can shift offsets. Returns up to 100 records, with hasMore derived from a 101st row. Read requests may replay after a lost acknowledgement. Does not modify game history or world state.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CoreProtectQuery' }
+      responses:
+        '200':
+          description: Query queued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BridgeTask' }
+        '400': { description: Invalid coordinate or time window }
+        '401': { description: Administrator required }
+        '409': { description: Current CoreProtect observation required }
+        '429': { description: Task capacity reached }
   /api/isles/players/{player}/pair:
     parameters:
       - { $ref: '#/components/parameters/player' }
@@ -604,6 +625,7 @@ paths:
               properties:
                 success: { type: boolean }
                 error: { type: string, maxLength: 500 }
+                coreprotectResult: { $ref: '#/components/schemas/CoreProtectResult' }
       responses:
         '204': { description: Result persisted; repeated acknowledgement is idempotent }
         '409': { description: Chunky operation must be claimed first }
@@ -873,14 +895,43 @@ components:
       required: [id, kind, uuid, grant, status, createdAt]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [whitelist, member, chunky] }
+        kind: { type: string, enum: [whitelist, member, chunky, coreprotect] }
         uuid: { type: string }
         group: { type: string }
         grant: { type: boolean }
         status: { type: string, enum: [pending, dispatched, applied, failed], description: Dispatched means claimed with no result yet; an interrupted operation is never automatically replayed }
         chunky: { $ref: '#/components/schemas/ChunkyOperation' }
+        coreprotect: { $ref: '#/components/schemas/CoreProtectQuery' }
+        coreprotectResult: { $ref: '#/components/schemas/CoreProtectResult' }
         error: { type: string }
         createdAt: { type: string, format: date-time }
+    CoreProtectQuery:
+      type: object
+      required: [world, x, y, z, seconds, offset]
+      properties:
+        world: { type: string, minLength: 1, maxLength: 256 }
+        x: { type: integer, minimum: -29999984, maximum: 29999984 }
+        y: { type: integer, minimum: -2048, maximum: 2048, description: Also checked against the actual loaded world height }
+        z: { type: integer, minimum: -29999984, maximum: 29999984 }
+        seconds: { type: integer, minimum: 1, maximum: 2592000 }
+        offset: { type: integer, minimum: 0, maximum: 10000 }
+    CoreProtectResult:
+      type: object
+      required: [records, hasMore]
+      properties:
+        hasMore: { type: boolean }
+        records:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [player, timestampMs, action, rolledBack]
+            properties:
+              player: { type: string, description: 'Recorded actor name, not a verified website identity' }
+              timestampMs: { type: integer, format: int64, description: Unix milliseconds }
+              action: { type: string, description: Original CoreProtect action string }
+              material: { type: string, description: Omitted when the provider cannot resolve material }
+              rolledBack: { type: boolean }
     Link:
       type: object
       required: [kind, url, label]

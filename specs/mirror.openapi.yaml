@@ -264,6 +264,168 @@ paths:
             application/json:
               schema:
                 $ref: "./common.yaml#/components/schemas/Error"
+    delete:
+      operationId: clearSkin
+      summary: 清除自定义皮肤（回落内置默认 Steve/Alex，按模型）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已清除
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skin/{name}/preset:
+    post:
+      operationId: applySkinPreset
+      summary: 应用 vanilla 内置预设皮肤（按体型取变体；不占配额）
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:
+                  type: string
+                  description: 预设 id（steve|alex|ari|efe|kai|makena|noor|sunny|zuri）
+                model:
+                  type: string
+                  enum: [default, slim]
+                  description: 留空=沿用玩家当前体型
+      responses:
+        "204":
+          description: 已应用
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skin/{name}/model:
+    post:
+      operationId: setPlayerModel
+      summary: 切换体型（default/slim）；内置皮肤自动换宽/窄变体
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [model]
+              properties:
+                model:
+                  type: string
+                  enum: [default, slim]
+      responses:
+        "204":
+          description: 已切换
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skin-presets:
+    get:
+      operationId: listSkinPresets
+      summary: 内置预设 id 列表
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ids]
+                properties:
+                  ids:
+                    type: array
+                    items:
+                      type: string
+  /skin-presets/{id}/{model}:
+    get:
+      operationId: getSkinPresetPNG
+      summary: 内置预设原图（公开、长缓存）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [default, slim]
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /skin-presets/{id}/{model}/{kind}:
+    get:
+      operationId: renderSkinPreset
+      summary: 内置预设的 2D 渲染视图（head|body|back|side），画廊缩略用人形正面而非材质表
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: model
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [default, slim]
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [head, body, back, side]
+        - name: scale
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
   /cape/{name}:
     get:
       operationId: getCape
@@ -306,6 +468,24 @@ paths:
         "204":
           description: 已保存
         "401":
+          $ref: "./common.yaml#/components/responses/Error"
+    delete:
+      operationId: clearCape
+      summary: 清除披风
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: 已清除
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "404":
           $ref: "./common.yaml#/components/responses/Error"
   /textures/{key}:
     get:
@@ -410,6 +590,37 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        "200":
+          description: PNG
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "./common.yaml#/components/responses/Error"
+  /renders/by-name/{name}/{kind}:
+    get:
+      operationId: renderByName
+      summary: 按玩家名出 2D 视图（head|body|back|side），无自定义皮肤时给内置默认
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [head, body, back, side]
+        - name: scale
+          in: query
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: PNG
@@ -572,6 +783,85 @@ paths:
           description: 已验证
         "400":
           $ref: "./common.yaml#/components/responses/Error"
+  /account/verify/resend:
+    post:
+      operationId: resendVerification
+      summary: 重发验证邮件（账号不存在或已验证时静默 204，不泄露存在性）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "204":
+          description: 已受理（是否真发信不对外暴露）
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+  /account/me:
+    get:
+      operationId: me
+      summary: 当前会话的账号信息（用户中心概览）
+      description: |
+        账号级操作，需网站会话（启动器会话 403 `web_session_required`）：响应含账号邮箱与
+        昵称，属于账号本身，而启动器令牌只证明了某一个玩家的身份。
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountMe"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
+  /account/password:
+    post:
+      operationId: changePassword
+      summary: 登录态修改主密码（成功后全部会话失效，需重新登录）
+      description: |
+        账号级操作，需网站会话（启动器会话 403 `web_session_required`）。
+        本端点另有 `currentPassword` 校验，所以启动器令牌即使不被中间件拦下也改不动密码；
+        显式拒绝是为了不把"两套凭据互不越界"这条不变量寄托在一个入参校验上。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  description: 须满足站点密码复杂度策略
+      responses:
+        "204":
+          description: 已修改
+        "400":
+          $ref: "./common.yaml#/components/responses/Error"
+        "401":
+          $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          description: |
+            两种情况共用 403，靠 `error` 字段区分：
+            - 稳定码 `web_session_required`：调用方是启动器会话。
+            - 本地化文案：`currentPassword` 不正确。
+          content:
+            application/json:
+              schema:
+                $ref: "./common.yaml#/components/schemas/Error"
   /account/forgot-password:
     post:
       operationId: forgotPassword
@@ -615,6 +905,11 @@ paths:
     get:
       operationId: listPlayers
       summary: 当前账号名下玩家列表
+      description: |
+        **启动器会话只看到它钉住的那一个玩家**（网站会话看到账号下全部）。
+        这是 ADR-0012「一条独立密码只证明它所属玩家的身份」在 HTTP 面上的落实：
+        若按 `UserID` 授权，知道某一个玩家的独立密码就能列出并操作同账号下别的玩家。
+        范围外与不存在一律同样处理，免得用玩家名探测账号结构。
       security:
         - bearerAuth: []
       responses:
@@ -631,6 +926,7 @@ paths:
     post:
       operationId: addPlayer
       summary: 为当前账号添加玩家名
+      description: 账号级操作，需网站会话（启动器会话 403）。
       security:
         - bearerAuth: []
       requestBody:
@@ -652,6 +948,8 @@ paths:
                 $ref: "#/components/schemas/Player"
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
         "409":
           $ref: "./common.yaml#/components/responses/Error"
   /account/players/{name}:
@@ -661,6 +959,9 @@ paths:
       description: |
         离线 UUID 由名字派生，改名会同时更换 uuid，并使该玩家的游戏会话与服务器绑定失效
         （启动器需重新登录）。已绑定微软正版的玩家（名字来自 Mojang）返回 409。
+
+        账号级操作，需网站会话（启动器会话 403）：改名会换掉身份本身，
+        不该由一条按设备发放、可单独撤销的玩家级凭据发起。
       security:
         - bearerAuth: []
       parameters:
@@ -687,6 +988,8 @@ paths:
           $ref: "./common.yaml#/components/responses/Error"
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
         "404":
           $ref: "./common.yaml#/components/responses/Error"
         "409":
@@ -698,7 +1001,11 @@ paths:
     delete:
       operationId: deletePlayer
       summary: 删除玩家（连同其会话与服务器绑定）
-      description: 账号至少保留一个玩家，删除唯一玩家返回 409。
+      description: |
+        账号至少保留一个玩家，删除唯一玩家返回 409。
+
+        账号级操作，需网站会话（启动器会话 403）：删除是破坏性的且影响整个账号，
+        不该由一条玩家级凭据发起——包括它自己钉住的那个玩家。
       security:
         - bearerAuth: []
       parameters:
@@ -708,6 +1015,8 @@ paths:
           description: 已删除
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
         "404":
           $ref: "./common.yaml#/components/responses/Error"
         "409":
@@ -720,7 +1029,12 @@ paths:
     get:
       operationId: listPlayerCredentials
       summary: 列出该玩家的启动器独立密码
-      description: 只返回元数据（名称/创建时间/最近使用），永不返回哈希或明文。最近使用的排在前面。
+      description: |
+        只返回元数据（名称/创建时间/最近使用），永不返回哈希或明文。最近使用的排在前面。
+
+        **玩家级端点，启动器会话可用**（这正是启动器管理独立密码的入口），但只对它钉住的
+        那个玩家；`{name}` 指向同账号下的其它玩家时返回 404，与"玩家不存在"不可区分。
+        网站会话可管理账号下任意玩家。
       security:
         - bearerAuth: []
       parameters:
@@ -751,6 +1065,10 @@ paths:
         Argon2id，条数直接放大失败尝试的成本，而"每台设备一条"用不到更多。
         密码由用户自己输入，故响应不回显明文。
         可以与主密码相同——两者互不影响，启动器只会匹配到独立密码。
+
+        **玩家级端点，启动器会话可用**，但只对它钉住的那个玩家；`{name}` 指向同账号下的
+        其它玩家时返回 404。这一条是越权面里最要紧的：能为别的玩家新建独立密码，
+        就等于把"知道 Alice 的一条独立密码"变成"控制 Bob"，而撤销 Alice 那条也拦不住。
       security:
         - bearerAuth: []
       parameters:
@@ -793,7 +1111,11 @@ paths:
     delete:
       operationId: deletePlayerCredential
       summary: 撤销一条启动器独立密码
-      description: 由该凭证建立的启动器会话经外键级联一并销毁（立刻掉线，不是等 24 小时过期）。
+      description: |
+        由该凭证建立的启动器会话经外键级联一并销毁（立刻掉线，不是等 24 小时过期）。
+
+        **玩家级端点，启动器会话可用**，但只对它钉住的那个玩家；`{name}` 或 `{credentialId}`
+        落在范围外时返回 404。撤销自己正在用的那条会立刻把自己登出——这是预期的自助撤销语义。
       security:
         - bearerAuth: []
       parameters:
@@ -819,6 +1141,10 @@ paths:
         该账号不能用皮肤/皮肤库/启动器登录/SSO，前端据此弹绑定引导。
         绑定由第三方登录自动写入（首次按邮箱匹配到既有账号即完成绑定），本站不提供解绑：
         解绑会让"强制绑定"策略变成死锁。
+
+        账号级操作，需网站会话（启动器会话 403）：绑定信息含第三方邮箱，属于账号本身而不是
+        某个玩家。启动器也不需要它——`binding_required` 由 `/authserver/authenticate` 以稳定码
+        直接返回，而那时会话还没建立。
       security:
         - bearerAuth: []
       responses:
@@ -830,6 +1156,8 @@ paths:
                 $ref: "#/components/schemas/BindingState"
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
   /account/players/{name}/premium:
     delete:
       operationId: unbindPremium
@@ -837,6 +1165,9 @@ paths:
       description: |
         清空该玩家的 premium_uuid，回到离线身份：此后可以本地改名，贴图不再回退 Mojang。
         幂等——未绑定时同样返回 204。
+
+        账号级操作，需网站会话（启动器会话 403）：解绑会改变身份来源（真 UUID → 离线 UUID），
+        与改名同属"改身份本身"，不该由一条玩家级凭据发起。
       security:
         - bearerAuth: []
       parameters:
@@ -846,6 +1177,8 @@ paths:
           description: 已解绑（或本就未绑定）
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
         "404":
           $ref: "./common.yaml#/components/responses/Error"
   /oauth/{provider}/auth:
@@ -947,6 +1280,10 @@ paths:
     get:
       operationId: mojangOauthAuth
       summary: 获取 Microsoft 正版绑定授权 URL
+      description: |
+        账号级操作，需网站会话（启动器会话 403 `web_session_required`）：正版绑定写在账号的
+        玩家上，且后续流程是浏览器授权码回跳，启动器无法参与。启动器要做的是把用户送到
+        网站的账号页，而不是自己发起绑定。
       security:
         - bearerAuth: []
       responses:
@@ -961,6 +1298,8 @@ paths:
                     type: string
         "401":
           $ref: "./common.yaml#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/WebSessionRequired"
   /mojang/oauth/callback:
     get:
       operationId: mojangOauthCallback
@@ -1969,11 +2308,42 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Yggdrasil accessToken（会话）
+      description: |
+        会话 accessToken（`Authorization: Bearer`，浏览器端可用 httpOnly cookie 替代）。
+
+        **会话有两种，授权范围不同**（ADR-0012）：
+        - **网站会话**（`/account/login`、OIDC）：代表账号本身，`player_id` 为空。
+        - **启动器会话**（`/authserver/authenticate`，玩家名 + 独立密码）：**钉住一个玩家**，
+          授权范围止于那个玩家。一条独立密码只证明它所属玩家的身份，不等于账号凭据。
+
+        因此账号级端点对启动器会话回 403 `web_session_required`（见
+        `components/responses/WebSessionRequired`），玩家级端点则把可见范围裁到该玩家。
+        后台管理端点**从不**接受启动器会话，即使它属于 role=admin 的账号。
     adminToken:
       type: http
       scheme: bearer
-      description: MIRROR_ADMIN_TOKEN
+      description: |
+        `MIRROR_ADMIN_TOKEN`（救援通道），或 role=admin 账号的**网站会话**令牌。
+
+        启动器会话一律不算管理员，即使它属于 role=admin 的账号：那个令牌是由某条玩家独立
+        密码换来的，会被备份、同步、在共享机器上留存，而独立密码的设计就是"按设备发放、
+        可单独撤销"。放行它等于把全站后台交给启动器数据目录里的一串 accessToken。
+        被拒时回 403，且不写入审计操作者（否则审计会记成 `user:<id>`，看不出是启动器令牌）。
+  responses:
+    WebSessionRequired:
+      description: |
+        需要网站会话：调用方用的是启动器会话（由某条玩家独立密码建立）。
+        `error` 字段是稳定错误码，启动器据此引导用户回网站的账号页操作，
+        而不是把一个裸 403 甩给用户。
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: string
+                enum: [web_session_required]
   parameters:
     ID:
       name: id
@@ -2150,7 +2520,7 @@ components:
             type: string
     RegisterRequirements:
       type: object
-      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, captchaCapUrl, captchaScopes, minPasswordLength, emailDomains]
+      required: [registrationDisabled, inviteOnly, captcha, captchaSiteKey, captchaCapUrl, captchaScopes, passwordPolicy, minPasswordLength, emailDomains]
       properties:
         registrationDisabled:
           type: boolean
@@ -2169,9 +2539,12 @@ components:
           description: 验证码保护范围（register | login）；前端据此决定注册/登录页是否渲染控件。验证码未生效时为空数组
           items:
             type: string
+        passwordPolicy:
+          description: 密码复杂度策略；前端输入时逐条实时判定，与后端校验同源
+          $ref: "#/components/schemas/PasswordPolicy"
         minPasswordLength:
           type: integer
-          description: 密码最小长度（与后端 account.MinPasswordLength 同源）
+          description: 密码最小长度（= passwordPolicy.minLength，保留作向后兼容字段）
         emailDomains:
           type: array
           description: 允许的邮箱域名；空数组表示不限制
@@ -2326,7 +2699,7 @@ components:
           description: 变更版本号，前端用作缓存击穿查询串
     SiteInfo:
       type: object
-      required: [name, description, copyright, icp]
+      required: [name, description, copyright, icp, loginLanding]
       properties:
         name:
           type: string
@@ -2337,6 +2710,10 @@ components:
         icp:
           type: string
           description: 备案展示文本（中国部署）
+        loginLanding:
+          type: string
+          description: 登录成功后的落地页（user=用户中心，默认；home=首页）；空串按 user 处理
+          enum: ["", user, home]
     SiteAssets:
       type: object
       required: [customCss, customJs]
@@ -2347,7 +2724,7 @@ components:
           type: string
     SitePublic:
       type: object
-      required: [name, description, copyright, icp, customCss, customJs]
+      required: [name, description, copyright, icp, loginLanding, customCss, customJs]
       properties:
         name:
           type: string
@@ -2357,6 +2734,9 @@ components:
           type: string
         icp:
           type: string
+        loginLanding:
+          type: string
+          description: 登录落地页（user|home，空串=user）
         customCss:
           type: boolean
         customJs:
@@ -2371,7 +2751,7 @@ components:
           $ref: "#/components/schemas/SiteAssets"
     RegistrationPolicy:
       type: object
-      required: [disableRegistration, inviteOnly, emailDomainWhitelist, captchaScopes]
+      required: [disableRegistration, inviteOnly, emailDomainWhitelist, captchaScopes, password, allowUnverifiedLogin]
       properties:
         disableRegistration:
           type: boolean
@@ -2387,6 +2767,41 @@ components:
           description: 验证码保护范围（register | login）；空数组=不保护
           items:
             type: string
+        password:
+          description: 密码复杂度策略；归一化后 minLength 恒在 [8,64]
+          $ref: "#/components/schemas/PasswordPolicy"
+        allowUnverifiedLogin:
+          type: boolean
+          description: 放行未验证邮箱登录（默认 false=注册必须完成邮件验证）；仅救援/迁移场景开启
+    AccountMe:
+      type: object
+      required: [email, nickname, verified]
+      properties:
+        email:
+          type: string
+        nickname:
+          type: string
+        verified:
+          type: boolean
+    PasswordPolicy:
+      type: object
+      required: [minLength, requireUpper, requireLower, requireDigit, requireSymbol]
+      properties:
+        minLength:
+          type: integer
+          description: 密码最小长度；后台可配，归一化夹在 [8,64]
+        requireUpper:
+          type: boolean
+          description: 需含大写字母
+        requireLower:
+          type: boolean
+          description: 需含小写字母
+        requireDigit:
+          type: boolean
+          description: 需含数字
+        requireSymbol:
+          type: boolean
+          description: 需含符号（非字母数字）
     Meta:
       type: object
       properties:
